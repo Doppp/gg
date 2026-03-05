@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import type { AgentEntry, AgentMatchStats, Match } from "../../match/types.js";
 import { formatCurrency, formatDuration, truncate } from "../../lib/format.js";
+import { theme } from "../theme.js";
 
 export interface PostMatchAgentModel {
   entry: AgentEntry;
@@ -59,17 +60,20 @@ export function PostMatch({ match, agents, selectedIndex }: PostMatchProps): Rea
   const rightLines = right ? buildDetailLines(match, right) : [];
 
   const maxRows = Math.max(leftLines.length, rightLines.length);
+  const undecided = !match.winnerId;
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold>Dual Broadcast | MATCH COMPLETE ({match.winnerId ? "DECIDED" : "UNDECIDED"})</Text>
-      <Text dimColor>
+      <Text bold color={undecided ? theme.warning : theme.success}>
+        Dual Broadcast | MATCH COMPLETE ({match.winnerId ? "DECIDED" : "UNDECIDED"})
+      </Text>
+      <Text color={theme.muted}>
         "{truncate(match.prompt, 72)}" | duration: {Math.round(match.stats.duration)}s
       </Text>
 
       <Box marginTop={1}>
-        <Box width="50%" borderStyle="round" borderColor="cyan" paddingX={1} marginRight={1} flexDirection="column">
-          <Text bold>
+        <Box width="50%" borderStyle="round" borderColor={theme.brand} paddingX={1} marginRight={1} flexDirection="column">
+          <Text bold color={theme.brand}>
             {">"} {leftName}
           </Text>
           {Array.from({ length: maxRows }).map((_, idx) => (
@@ -77,8 +81,8 @@ export function PostMatch({ match, agents, selectedIndex }: PostMatchProps): Rea
           ))}
         </Box>
 
-        <Box width="50%" borderStyle="round" borderColor="gray" paddingX={1} flexDirection="column">
-          <Text bold>{rightName}</Text>
+        <Box width="50%" borderStyle="round" borderColor={theme.muted} paddingX={1} flexDirection="column">
+          <Text bold color={theme.muted}>{rightName}</Text>
           {Array.from({ length: maxRows }).map((_, idx) => (
             <Text key={`right-${idx}`}>{rightLines[idx] ?? ""}</Text>
           ))}
@@ -86,8 +90,8 @@ export function PostMatch({ match, agents, selectedIndex }: PostMatchProps): Rea
       </Box>
 
       <Box marginTop={1} flexDirection="column">
-        <Text dimColor>[d] diff [←→] switch focus [b] preview [v] thread</Text>
-        <Text dimColor>[w] pick winner [r] rematch [n] new match [?] help</Text>
+        <Text color={theme.accent}>[d] diff [←→] switch focus [b] preview [v] thread [t] terminal</Text>
+        <Text color={theme.accent}>[u] test [c] build [s] serve [g] run [w] winner [r] rematch [n] new</Text>
       </Box>
     </Box>
   );

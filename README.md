@@ -54,6 +54,18 @@ gg config allowSecrets true
 gg config leaderboard true
 ```
 
+## Interactive Review
+
+After a match completes (Post-Match view):
+
+- `t`: open an interactive shell in the focused agent worktree
+- `u`: run review test command in focused worktree
+- `c`: run review build command in focused worktree
+- `s`: run review serve command in focused worktree (Ctrl+C to stop)
+- `g`: run review run command in focused worktree
+
+Commands come from `gg.config.json > review` (with `u` falling back to the first `checks` entry if needed).
+
 ## Config files
 
 - User config: `~/.config/gg/gg.toml` or local `./gg.toml`

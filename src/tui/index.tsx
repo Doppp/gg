@@ -2,6 +2,7 @@ import path from "node:path";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import type Database from "better-sqlite3";
+import { execa, execaCommand } from "execa";
 import { detectInstalledAgents } from "../agents/detector.js";
 import { loadConfig, loadRepoConfig, type RepoConfig } from "../config/config.js";
 import { DEFAULT_CONFIG, type GGConfig } from "../config/defaults.js";
@@ -35,6 +36,7 @@ import { PostMatch } from "./components/PostMatch.js";
 import { SplitPane } from "./components/SplitPane.js";
 import { StatusBar, type StatusMode } from "./components/StatusBar.js";
 import type { LiveAgentPaneModel } from "./components/AgentPane.js";
+import { theme } from "./theme.js";
 
 type ViewId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -112,6 +114,8 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
   const [postMatchAgentIndex, setPostMatchAgentIndex] = useState(0);
   const [thread, setThread] = useState<MatchThreadType | undefined>(undefined);
   const [diffPreview, setDiffPreview] = useState<string>("");
+  const [externalSessionActive, setExternalSessionActive] = useState(false);
+  const [externalSessionLabel, setExternalSessionLabel] = useState("");
 
   const [leaderboardRows, setLeaderboardRows] = useState<LeaderboardRow[]>([]);
   const [historyRows, setHistoryRows] = useState<MatchListItem[]>([]);
@@ -301,6 +305,124 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     });
   }
 
+  function focusedAgent(): AgentEntry | null {
+    if (!currentMatch) {
+      return null;
+    }
+    return currentMatch.agents[postMatchAgentIndex] ?? currentMatch.agents[0] ?? null;
+  }
+
+  function exitAltScreen(): void {
+    if (!process.stdout.isTTY) {
+      return;
+    }
+    process.stdout.write("\u001B[?1049l");
+  }
+
+  function enterAltScreen(): void {
+    if (!process.stdout.isTTY) {
+      return;
+    }
+    process.stdout.write("\u001B[?1049h\u001B[2J\u001B[H");
+  }
+
+  async function runExternalSessionForAgent(agent: AgentEntry, command: string | null, label: string): Promise<void> {
+    if (externalSessionActive) {
+      return;
+    }
+
+    const stdin = process.stdin;
+    const canSetRaw = stdin.isTTY && typeof stdin.setRawMode === "function";
+
+    setExternalSessionActive(true);
+    setExternalSessionLabel(`${agent.provider}: ${label}`);
+    setNotice(`Opening ${label} in ${agent.provider} worktree...`);
+
+    try {
+      if (canSetRaw) {
+        stdin.setRawMode(false);
+      }
+
+      exitAltScreen();
+
+      if (command) {
+        await execaCommand(command, {
+          cwd: agent.worktreePath,
+          stdio: "inherit",
+          shell: true,
+          reject: false,
+          env: {
+            ...process.env
+          }
+        });
+      } else {
+        const shell = process.env.SHELL ?? process.env.COMSPEC ?? "bash";
+        await execa(shell, [], {
+          cwd: agent.worktreePath,
+          stdio: "inherit",
+          reject: false,
+          env: {
+            ...process.env
+          }
+        });
+      }
+    } catch (error) {
+      setNotice(`Review session failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      enterAltScreen();
+
+      if (canSetRaw) {
+        stdin.setRawMode(true);
+      }
+
+      setExternalSessionActive(false);
+      setExternalSessionLabel("");
+      setNotice(`Returned from ${label} in ${agent.provider}`);
+    }
+  }
+
+  async function openTerminalForFocusedAgent(): Promise<void> {
+    const agent = focusedAgent();
+    if (!agent) {
+      setNotice("No focused agent selected.");
+      return;
+    }
+    await runExternalSessionForAgent(agent, null, "interactive shell");
+  }
+
+  async function runConfiguredReviewCommand(kind: "test" | "build" | "serve" | "run"): Promise<void> {
+    const agent = focusedAgent();
+    if (!agent) {
+      setNotice("No focused agent selected.");
+      return;
+    }
+
+    const review = repoConfig.review ?? {};
+    let command: string | undefined;
+
+    if (kind === "test") {
+      command = review.test ?? repoConfig.checks?.[0];
+    } else if (kind === "build") {
+      command = review.build;
+    } else if (kind === "serve") {
+      command = review.serve;
+    } else {
+      command = review.run;
+    }
+
+    if (!command) {
+      setNotice(`No review.${kind} command configured in gg.config.json`);
+      return;
+    }
+
+    const label = `${kind}: ${command}`;
+    await runExternalSessionForAgent(agent, command, label);
+
+    if (kind === "serve" && review.url) {
+      setNotice(`Serve session ended. URL: ${review.url}`);
+    }
+  }
+
   async function startMatch(): Promise<void> {
     if (!repoIsClean) {
       setNotice("Cannot start: working tree is dirty. Commit/stash changes first.");
@@ -438,7 +560,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       return;
     }
 
-    const selected = currentMatch.agents[postMatchAgentIndex] ?? currentMatch.agents[0];
+    const selected = focusedAgent();
     if (!selected) {
       return;
     }
@@ -453,7 +575,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       return;
     }
 
-    const selected = currentMatch.agents[postMatchAgentIndex] ?? currentMatch.agents[0];
+    const selected = focusedAgent();
     if (!selected) {
       return;
     }
@@ -474,7 +596,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       return;
     }
 
-    const selected = currentMatch.agents[postMatchAgentIndex] ?? currentMatch.agents[0];
+    const selected = focusedAgent();
     if (!selected) {
       return;
     }
@@ -494,7 +616,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       return;
     }
 
-    const selected = currentMatch.agents[postMatchAgentIndex] ?? currentMatch.agents[0];
+    const selected = focusedAgent();
     if (!selected) {
       return;
     }
@@ -530,6 +652,10 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
   }
 
   useInput((input, key) => {
+    if (externalSessionActive) {
+      return;
+    }
+
     if (key.ctrl && input.toLowerCase() === "c") {
       void handleQuit();
       return;
@@ -596,6 +722,31 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
 
     if (activeView === 3 && input === "v") {
       viewThreadForSelectedAgent();
+      return;
+    }
+
+    if (activeView === 3 && input === "t") {
+      void openTerminalForFocusedAgent();
+      return;
+    }
+
+    if (activeView === 3 && input === "u") {
+      void runConfiguredReviewCommand("test");
+      return;
+    }
+
+    if (activeView === 3 && input === "c") {
+      void runConfiguredReviewCommand("build");
+      return;
+    }
+
+    if (activeView === 3 && input === "s") {
+      void runConfiguredReviewCommand("serve");
+      return;
+    }
+
+    if (activeView === 3 && input === "g") {
+      void runConfiguredReviewCommand("run");
       return;
     }
 
@@ -735,19 +886,21 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
   return (
     <Box flexDirection="column">
       <Box paddingX={1} flexDirection="column">
-        <Text bold>gg</Text>
-        <Text dimColor>
+        <Text bold color={theme.brand}>
+          gg
+        </Text>
+        <Text color={theme.muted}>
           Good game. Every time. | repo: {repoName} | base: {baseBranch} | view {activeView}: {viewLabel(activeView)}
         </Text>
-        <Text dimColor>[1]Setup [2]Live [3]Stats [4]Thread [5]Leaderboard [6]History [7]Profile [?]Help [q]Quit</Text>
-        <Text dimColor>
+        <Text color={theme.accent}>[1]Setup [2]Live [3]Stats [4]Thread [5]Leaderboard [6]History [7]Profile [?]Help [q]Quit</Text>
+        <Text color={theme.muted}>
           Default time limit:{" "}
           {config.gg.default_time_limit > 0
             ? `${Math.floor(config.gg.default_time_limit / 60)} min`
             : "none (unlimited)"}{" "}
           | Selected agents: {selectedAgentProviders.length}
         </Text>
-        {h2hSummary ? <Text dimColor>{h2hSummary}</Text> : null}
+        {h2hSummary ? <Text color={theme.muted}>{h2hSummary}</Text> : null}
         {warnings.map((warning, index) => (
           <Text key={`warning-${index}`} color="yellow">
             Warning: {warning}
@@ -766,6 +919,12 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       {notice ? (
         <Box paddingX={1}>
           <Text color="yellow">{notice}</Text>
+        </Box>
+      ) : null}
+
+      {externalSessionActive ? (
+        <Box paddingX={1}>
+          <Text color={theme.warning}>External session active: {externalSessionLabel}</Text>
         </Box>
       ) : null}
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { theme } from "../theme.js";
 
 export interface SetupAgentOption {
   provider: string;
@@ -154,44 +155,49 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold>Match Setup</Text>
-      <Text dimColor>Tab focus | Enter edit prompt | Space start match | 1-7 switch tabs</Text>
+      <Text bold color={theme.brand}>
+        Match Setup
+      </Text>
+      <Text color={theme.muted}>Tab focus | Enter edit prompt | Space start match | 1-7 switch tabs</Text>
 
-      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 0 ? "green" : "gray"} paddingX={1} flexDirection="column">
-        <Text>
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 0 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 0 ? theme.focus : undefined}>
           {focusIndex === 0 ? ">" : " "} Prompt {isEditingPrompt ? "(editing, Esc/Ctrl+S to stop)" : "(press Enter to edit)"}
         </Text>
         <Text>{promptPreview}</Text>
       </Box>
 
-      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 1 ? "green" : "gray"} paddingX={1} flexDirection="column">
-        <Text>{focusIndex === 1 ? ">" : " "} Agents (pick 2+)</Text>
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 1 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 1 ? theme.focus : undefined}>{focusIndex === 1 ? ">" : " "} Agents (pick 2+)</Text>
         {availableAgents.length === 0 ? (
-          <Text color="yellow">No compatible agents detected. Install `claude` or `codex` CLI.</Text>
+          <Text color={theme.warning}>No compatible agents detected. Install `claude` or `codex` CLI.</Text>
         ) : (
           availableAgents.map((agent, index) => {
             const isSelected = selectedAgentProviders.includes(agent.provider);
             const isCursor = focusIndex === 1 && index === agentCursor;
             return (
-              <Text key={`${agent.provider}:${agent.command}`}>
+              <Text
+                key={`${agent.provider}:${agent.command}`}
+                color={isCursor ? theme.focus : isSelected ? theme.success : undefined}
+              >
                 {isCursor ? ">" : " "} [{isSelected ? "x" : " "}] {agent.provider} ({agent.version})
               </Text>
             );
           })
         )}
-        <Text dimColor>
+        <Text color={theme.muted}>
           Selected: {selectedCount} | Space toggle | j/k move cursor | a select all
         </Text>
       </Box>
 
-      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 2 ? "green" : "gray"} paddingX={1} flexDirection="column">
-        <Text>{focusIndex === 2 ? ">" : " "} Time Limit</Text>
-        <Text>
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 2 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 2 ? theme.focus : undefined}>{focusIndex === 2 ? ">" : " "} Time Limit</Text>
+        <Text color={timeLimitSeconds === null ? theme.warning : undefined}>
           {timeLimitSeconds === null
             ? "none (unlimited)"
             : `${Math.floor(timeLimitSeconds / 60)} min (${timeLimitSeconds}s)`}
         </Text>
-        <Text dimColor>Use left/right or +/- to adjust | t toggle unlimited</Text>
+        <Text color={theme.muted}>Use left/right or +/- to adjust | t toggle unlimited</Text>
       </Box>
     </Box>
   );

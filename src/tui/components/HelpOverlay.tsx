@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
+import { theme } from "../theme.js";
 
 const HELP_ROWS: Array<[string, string]> = [
   ["1-7", "switch views"],
@@ -12,6 +13,8 @@ const HELP_ROWS: Array<[string, string]> = [
   ["d", "show git diff"],
   ["b", "preview branch"],
   ["v", "view match thread"],
+  ["t", "open focused worktree shell"],
+  ["u/c/s/g", "test/build/serve/run focused worktree"],
   ["w", "pick winner"],
   ["r", "rematch"],
   ["n", "new match"],
@@ -22,14 +25,17 @@ const HELP_ROWS: Array<[string, string]> = [
 
 export function HelpOverlay(): React.JSX.Element {
   return (
-    <Box borderStyle="double" borderColor="cyan" flexDirection="column" paddingX={1}>
-      <Text bold>Help</Text>
+    <Box borderStyle="double" borderColor={theme.brand} flexDirection="column" paddingX={1}>
+      <Text bold color={theme.brand}>
+        Help
+      </Text>
       {HELP_ROWS.map(([key, description]) => (
         <Text key={key}>
-          {key.padEnd(10, " ")} {description}
+          <Text color={theme.accent}>{key.padEnd(16, " ")}</Text>
+          <Text color={theme.muted}>{description}</Text>
         </Text>
       ))}
-      <Text dimColor>Press Esc or ? to close.</Text>
+      <Text color={theme.muted}>Press Esc or ? to close.</Text>
     </Box>
   );
 }

@@ -6,6 +6,13 @@ import { DEFAULT_CONFIG, type GGConfig } from "./defaults.js";
 
 export interface RepoConfig {
   checks?: string[];
+  review?: {
+    test?: string;
+    build?: string;
+    serve?: string;
+    run?: string;
+    url?: string;
+  };
   guard?: {
     allow?: string[];
     deny?: string[];

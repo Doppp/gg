@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { MatchThread as MatchThreadType } from "../../match/types.js";
+import { theme } from "../theme.js";
 
 interface MatchThreadProps {
   thread?: MatchThreadType;
@@ -68,8 +69,10 @@ export function MatchThread({ thread }: MatchThreadProps): React.JSX.Element {
   if (!thread) {
     return (
       <Box paddingX={1} flexDirection="column">
-        <Text bold>Match Thread</Text>
-        <Text dimColor>No thread selected.</Text>
+        <Text bold color={theme.brand}>
+          Match Thread
+        </Text>
+        <Text color={theme.muted}>No thread selected.</Text>
       </Box>
     );
   }
@@ -78,11 +81,13 @@ export function MatchThread({ thread }: MatchThreadProps): React.JSX.Element {
 
   return (
     <Box paddingX={1} flexDirection="column">
-      <Text bold>
+      <Text bold color={theme.brand}>
         Match Thread: {thread.provider} ({thread.agentId})
       </Text>
       {events.map((event, idx) => (
-        <Text key={`${event.timestamp}-${idx}`}>{renderEvent(event)}</Text>
+        <Text key={`${event.timestamp}-${idx}`} color={event.type === "risk_flag" || event.type === "stderr" ? theme.danger : undefined}>
+          {renderEvent(event)}
+        </Text>
       ))}
     </Box>
   );

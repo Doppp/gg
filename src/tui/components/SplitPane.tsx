@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { AgentPane, type LiveAgentPaneModel } from "./AgentPane.js";
+import { theme } from "../theme.js";
 
 interface SplitPaneProps {
   panes: LiveAgentPaneModel[];
@@ -23,11 +24,13 @@ export function SplitPane({ panes, focusedPaneId, prompt, elapsedSeconds }: Spli
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text bold>Dual Broadcast | MATCH LIVE</Text>
-      <Text dimColor>
+      <Text bold color={theme.brand}>
+        Dual Broadcast | MATCH LIVE
+      </Text>
+      <Text color={theme.muted}>
         prompt: {prompt && prompt.trim().length > 0 ? prompt : "(empty prompt)"} | elapsed: {elapsedSeconds ?? 0}s
       </Text>
-      <Text dimColor>x stop all | [←→] switch focused agent | [d] diff [b] preview [v] thread (post-match)</Text>
+      <Text color={theme.accent}>x stop all | [←→] switch focused agent | [d] diff [b] preview [v] thread (post-match)</Text>
 
       <Box marginTop={1}>
         {primary.map((pane) => (
@@ -37,7 +40,7 @@ export function SplitPane({ panes, focusedPaneId, prompt, elapsedSeconds }: Spli
 
       {secondary.length > 0 ? (
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>Additional Agents</Text>
+          <Text color={theme.muted}>Additional Agents</Text>
           {secondary.map((pane) => (
             <Box key={pane.id}>
               <AgentPane pane={pane} focused={pane.id === focusedPaneId} />

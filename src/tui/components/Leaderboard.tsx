@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { LeaderboardRow } from "../../store/queries.js";
+import { theme } from "../theme.js";
 
 interface LeaderboardProps {
   rows: LeaderboardRow[];
@@ -27,12 +28,14 @@ export function Leaderboard({ rows, sortBy }: LeaderboardProps): React.JSX.Eleme
 
   return (
     <Box paddingX={1} flexDirection="column">
-      <Text bold>Leaderboard</Text>
-      <Text dimColor>[s] sort column | [/] filter (planned)</Text>
-      <Text>provider           matches  wins  win%   avg-time  avg-cost</Text>
-      {sorted.length === 0 ? <Text dimColor>(no matches yet)</Text> : null}
+      <Text bold color={theme.brand}>
+        Leaderboard
+      </Text>
+      <Text color={theme.accent}>[s] sort column | [/] filter (planned)</Text>
+      <Text color={theme.muted}>provider           matches  wins  win%   avg-time  avg-cost</Text>
+      {sorted.length === 0 ? <Text color={theme.muted}>(no matches yet)</Text> : null}
       {sorted.map((row) => (
-        <Text key={row.provider}>
+        <Text key={row.provider} color={row.winRate >= 0.5 ? theme.success : undefined}>
           {row.provider.padEnd(18, " ")}
           {String(row.matches).padStart(7, " ")}
           {String(row.wins).padStart(6, " ")}

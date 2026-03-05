@@ -4,6 +4,13 @@
     "npm run lint",
     "npm run typecheck"
   ],
+  "review": {
+    "test": "npm test",
+    "build": "npm run build",
+    "serve": "npm run dev",
+    "run": "node dist/cli.js --help",
+    "url": "http://localhost:3000"
+  },
   "guard": {
     "allow": ["src/components/*", "src/styles/*", "src/hooks/*"],
     "deny": ["src/auth/*", ".env*", "*.key"]

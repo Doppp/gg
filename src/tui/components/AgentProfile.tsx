@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { AgentProfile as AgentProfileType } from "../../match/types.js";
+import { theme } from "../theme.js";
 
 interface AgentProfileProps {
   profile: AgentProfileType | null;
@@ -10,15 +11,19 @@ export function AgentProfile({ profile }: AgentProfileProps): React.JSX.Element 
   if (!profile) {
     return (
       <Box paddingX={1} flexDirection="column">
-        <Text bold>Agent Profile</Text>
-        <Text dimColor>No profile selected or no data yet.</Text>
+        <Text bold color={theme.brand}>
+          Agent Profile
+        </Text>
+        <Text color={theme.muted}>No profile selected or no data yet.</Text>
       </Box>
     );
   }
 
   return (
     <Box paddingX={1} flexDirection="column">
-      <Text bold>Agent Profile: {profile.provider}</Text>
+      <Text bold color={theme.brand}>
+        Agent Profile: {profile.provider}
+      </Text>
       <Text>
         matches={profile.matches} wins={profile.wins} losses={profile.losses} dnfs={profile.dnfs} winRate={(
           profile.winRate * 100
