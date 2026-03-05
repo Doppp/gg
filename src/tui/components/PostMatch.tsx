@@ -14,84 +14,81 @@ interface PostMatchProps {
   selectedIndex: number;
 }
 
-function padCell(value: string, width = 16): string {
-  if (value.length >= width) {
-    return value.slice(0, width);
+function summaryChecks(stats: AgentMatchStats | undefined): string {
+  if (!stats?.checksResults || stats.checksResults.length === 0) {
+    return "n/a";
   }
-  return `${" ".repeat(width - value.length)}${value}`;
+
+  const passed = stats.checksResults.filter((item) => item.passed).length;
+  return `${passed}/${stats.checksResults.length}`;
 }
 
-function statValue(stats: AgentMatchStats | undefined, key: string): string {
-  if (!stats) {
-    return "-";
+function outcomeLabel(match: Match, entry: AgentEntry, stats: AgentMatchStats | undefined): string {
+  if (match.winnerId) {
+    return match.winnerId === entry.id ? "winner" : "loser";
   }
 
-  switch (key) {
-    case "time":
-      return formatDuration(Math.round(stats.timeToCompletion));
-    case "first":
-      return formatDuration(Math.round(stats.timeToFirstOutput));
-    case "files":
-      return String(stats.filesChanged);
-    case "ins":
-      return `+${stats.insertions}`;
-    case "del":
-      return `-${stats.deletions}`;
-    case "commits":
-      return String(stats.commits);
-    case "tokens":
-      return stats.tokensUsed.toLocaleString();
-    case "cost":
-      return formatCurrency(stats.costUSD);
-    case "checks":
-      if (!stats.checksResults || stats.checksResults.length === 0) {
-        return "n/a";
-      }
-      return stats.checksResults.every((item) => item.passed) ? "✓" : "✗";
-    case "risk":
-      return stats.riskFlags.length === 0 ? "none" : truncate(stats.riskFlags[0], 16);
-    default:
-      return "-";
+  if (stats?.outcome === "dnf" || entry.status === "failed" || entry.status === "timeout") {
+    return "dnf";
   }
+
+  return "pending";
+}
+
+function buildDetailLines(match: Match, model: PostMatchAgentModel): string[] {
+  const stats = model.stats;
+
+  return [
+    `outcome: ${outcomeLabel(match, model.entry, stats)}`,
+    `time: ${formatDuration(Math.round(stats?.timeToCompletion ?? 0))}  first: ${formatDuration(Math.round(stats?.timeToFirstOutput ?? 0))}`,
+    `files: ${stats?.filesChanged ?? 0}  +${stats?.insertions ?? 0}/-${stats?.deletions ?? 0}  commits: ${stats?.commits ?? 0}`,
+    `tokens: ${(stats?.tokensUsed ?? 0).toLocaleString()}  cost: ${formatCurrency(stats?.costUSD ?? 0)}`,
+    `checks: ${summaryChecks(stats)}`,
+    `risk: ${stats?.riskFlags && stats.riskFlags.length > 0 ? truncate(stats.riskFlags[0], 60) : "none"}`
+  ];
 }
 
 export function PostMatch({ match, agents, selectedIndex }: PostMatchProps): React.JSX.Element {
   const left = agents[selectedIndex] ?? agents[0];
   const right = agents[(selectedIndex + 1) % Math.max(1, agents.length)] ?? agents[1] ?? left;
 
-  const leftName = left ? truncate(left.entry.provider, 16) : "agent-a";
-  const rightName = right ? truncate(right.entry.provider, 16) : "agent-b";
+  const leftName = left ? left.entry.provider.toUpperCase() : "AGENT-A";
+  const rightName = right ? right.entry.provider.toUpperCase() : "AGENT-B";
 
-  const rows = [
-    [statValue(left?.stats, "time"), "Time", statValue(right?.stats, "time")],
-    [statValue(left?.stats, "first"), "First Output", statValue(right?.stats, "first")],
-    [statValue(left?.stats, "files"), "Files Changed", statValue(right?.stats, "files")],
-    [statValue(left?.stats, "ins"), "Insertions", statValue(right?.stats, "ins")],
-    [statValue(left?.stats, "del"), "Deletions", statValue(right?.stats, "del")],
-    [statValue(left?.stats, "commits"), "Commits", statValue(right?.stats, "commits")],
-    [statValue(left?.stats, "tokens"), "Tokens Used", statValue(right?.stats, "tokens")],
-    [statValue(left?.stats, "cost"), "Cost", statValue(right?.stats, "cost")],
-    [statValue(left?.stats, "checks"), "Checks Passing", statValue(right?.stats, "checks")],
-    [statValue(left?.stats, "risk"), "Risk Flags", statValue(right?.stats, "risk")]
-  ];
+  const leftLines = left ? buildDetailLines(match, left) : [];
+  const rightLines = right ? buildDetailLines(match, right) : [];
+
+  const maxRows = Math.max(leftLines.length, rightLines.length);
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Text>┌─────────────────────────────────────────────────────────┐</Text>
-      <Text>│                    MATCH COMPLETE                        │</Text>
-      <Text>│ {truncate(`\"${match.prompt}\"`, 55).padEnd(55, " ")} │</Text>
-      <Text>├──────────────────┬───────────────────┬──────────────────┤</Text>
-      <Text>│{padCell(leftName)} │                   │{padCell(rightName)} │</Text>
-      <Text>├──────────────────┼───────────────────┼──────────────────┤</Text>
-      {rows.map((row) => (
-        <Text key={row[1]}>
-          │{padCell(row[0])} │ {row[1].padEnd(17, " ")} │{padCell(row[2])} │
-        </Text>
-      ))}
-      <Text>├──────────────────┴───────────────────┴──────────────────┤</Text>
-      <Text>│ [d] diff [←→] switch agent [b] preview [v] thread        │</Text>
-      <Text>│ [w] pick winner [r] rematch [n] new match [?] help       │</Text>
-      <Text>└─────────────────────────────────────────────────────────┘</Text>
+      <Text bold>Dual Broadcast | MATCH COMPLETE ({match.winnerId ? "DECIDED" : "UNDECIDED"})</Text>
+      <Text dimColor>
+        "{truncate(match.prompt, 72)}" | duration: {Math.round(match.stats.duration)}s
+      </Text>
+
+      <Box marginTop={1}>
+        <Box width="50%" borderStyle="round" borderColor="cyan" paddingX={1} marginRight={1} flexDirection="column">
+          <Text bold>
+            {">"} {leftName}
+          </Text>
+          {Array.from({ length: maxRows }).map((_, idx) => (
+            <Text key={`left-${idx}`}>{leftLines[idx] ?? ""}</Text>
+          ))}
+        </Box>
+
+        <Box width="50%" borderStyle="round" borderColor="gray" paddingX={1} flexDirection="column">
+          <Text bold>{rightName}</Text>
+          {Array.from({ length: maxRows }).map((_, idx) => (
+            <Text key={`right-${idx}`}>{rightLines[idx] ?? ""}</Text>
+          ))}
+        </Box>
+      </Box>
+
+      <Box marginTop={1} flexDirection="column">
+        <Text dimColor>[d] diff [←→] switch focus [b] preview [v] thread</Text>
+        <Text dimColor>[w] pick winner [r] rematch [n] new match [?] help</Text>
+      </Box>
     </Box>
   );
 }

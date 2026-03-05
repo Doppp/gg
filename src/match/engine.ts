@@ -98,9 +98,6 @@ function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void
 }
 
 function agentOutcomeFromStatus(status: AgentEntry["status"]): "winner" | "loser" | "dnf" | undefined {
-  if (status === "completed") {
-    return "loser";
-  }
   if (status === "failed" || status === "timeout") {
     return "dnf";
   }

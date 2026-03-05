@@ -13,12 +13,24 @@ export interface LiveAgentPaneModel {
 
 interface AgentPaneProps {
   pane: LiveAgentPaneModel;
+  focused?: boolean;
 }
 
-export function AgentPane({ pane }: AgentPaneProps): React.JSX.Element {
+export function AgentPane({ pane, focused = false }: AgentPaneProps): React.JSX.Element {
+  const outputLines = pane.lines.slice(-18);
+
   return (
-    <Box flexDirection="column" borderStyle="round" paddingX={1} width="50%" marginRight={1}>
-      <Text bold>{pane.provider}</Text>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={focused ? "cyan" : "gray"}
+      paddingX={1}
+      width="50%"
+      marginRight={1}
+    >
+      <Text bold>
+        {focused ? ">" : " "} {pane.provider.toUpperCase()}
+      </Text>
       <Text dimColor>
         Status: {pane.status}
         {pane.pid ? ` | pid ${pane.pid}` : ""}
@@ -30,10 +42,10 @@ export function AgentPane({ pane }: AgentPaneProps): React.JSX.Element {
         <Text dimColor>Risk: none</Text>
       )}
       <Box flexDirection="column" marginTop={1}>
-        {pane.lines.length === 0 ? (
+        {outputLines.length === 0 ? (
           <Text dimColor>(no output yet)</Text>
         ) : (
-          pane.lines.map((line, idx) => <Text key={`${pane.id}-${idx}`}>{line}</Text>)
+          outputLines.map((line, idx) => <Text key={`${pane.id}-${idx}`}>{line}</Text>)
         )}
       </Box>
     </Box>

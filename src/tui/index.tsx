@@ -284,6 +284,23 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     setPostMatchAgentIndex(0);
   }
 
+  function selectedAgentCount(): number {
+    if (currentMatch?.agents.length) {
+      return currentMatch.agents.length;
+    }
+    return Math.max(1, selectedAgentProviders.length);
+  }
+
+  function cycleFocusedAgent(direction: "left" | "right"): void {
+    setPostMatchAgentIndex((value) => {
+      const length = selectedAgentCount();
+      if (direction === "left") {
+        return (value - 1 + length) % length;
+      }
+      return (value + 1) % length;
+    });
+  }
+
   async function startMatch(): Promise<void> {
     if (!repoIsClean) {
       setNotice("Cannot start: working tree is dirty. Commit/stash changes first.");
@@ -557,19 +574,13 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       return;
     }
 
-    if (activeView === 3 && key.leftArrow) {
-      setPostMatchAgentIndex((value) => {
-        const length = currentMatch?.agents.length ?? 1;
-        return (value - 1 + length) % length;
-      });
+    if ((activeView === 2 || activeView === 3) && key.leftArrow) {
+      cycleFocusedAgent("left");
       return;
     }
 
-    if (activeView === 3 && key.rightArrow) {
-      setPostMatchAgentIndex((value) => {
-        const length = currentMatch?.agents.length ?? 1;
-        return (value + 1) % length;
-      });
+    if ((activeView === 2 || activeView === 3) && key.rightArrow) {
+      cycleFocusedAgent("right");
       return;
     }
 
@@ -665,7 +676,20 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     }
 
     if (activeView === 2) {
-      return <SplitPane panes={Object.values(livePanes)} />;
+      const paneList = currentMatch?.agents.length
+        ? currentMatch.agents.map((agent) => livePanes[agent.id]).filter((pane): pane is LiveAgentPaneModel => Boolean(pane))
+        : Object.values(livePanes);
+
+      const focusedPane = paneList[postMatchAgentIndex] ?? paneList[0];
+
+      return (
+        <SplitPane
+          panes={paneList}
+          focusedPaneId={focusedPane?.id}
+          prompt={currentMatch?.prompt ?? prompt}
+          elapsedSeconds={elapsedSeconds}
+        />
+      );
     }
 
     if (activeView === 3) {

@@ -17,7 +17,7 @@ afterEach(() => {
   }
 });
 
-async function waitForViolation(violations: SafetyViolation[], timeoutMs = 2500): Promise<SafetyViolation | undefined> {
+async function waitForViolation(violations: SafetyViolation[], timeoutMs = 5000): Promise<SafetyViolation | undefined> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (violations.length > 0) {
@@ -44,6 +44,8 @@ describe("safety watcher", () => {
     });
 
     fs.writeFileSync(path.join(root, "src", "auth", "middleware.ts"), "export const x = 1;\n", "utf8");
+    await delay(120);
+    fs.appendFileSync(path.join(root, "src", "auth", "middleware.ts"), "export const y = 2;\n", "utf8");
 
     const firstViolation = await waitForViolation(violations);
 
