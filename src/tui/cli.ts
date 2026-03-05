@@ -24,7 +24,12 @@ export async function launchTui(options: LaunchTuiOptions = {}): Promise<void> {
 
   process.chdir(repoPath);
   const app = render(React.createElement(App, { repoPath }));
-  await app.waitUntilExit();
+
+  try {
+    await app.waitUntilExit();
+  } finally {
+    app.clear();
+  }
 }
 
 const isEntrypoint = process.argv[1]
