@@ -1,0 +1,29 @@
+[gg]
+theme = "dark"
+default_time_limit = 600
+worktree_dir = ".gg-worktrees"
+
+[agents.claude]
+enabled = true
+api_key = "$ANTHROPIC_API_KEY"
+command = "claude"
+args = ["--dangerously-skip-permissions"]
+
+[agents.codex]
+enabled = true
+api_key = "$OPENAI_API_KEY"
+command = "codex"
+args = []
+
+[cost]
+match_budget_usd = 5.00
+daily_budget_usd = 20.00
+warn_threshold = 0.8
+
+[safety]
+allow_secrets = false
+
+[leaderboard]
+enabled = false
+endpoint = "https://gg.sh/api/match"
+default_privacy = "private"

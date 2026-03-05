@@ -1,0 +1,11 @@
+{
+  "checks": [
+    "npm test",
+    "npm run lint",
+    "npm run typecheck"
+  ],
+  "guard": {
+    "allow": ["src/components/*", "src/styles/*", "src/hooks/*"],
+    "deny": ["src/auth/*", ".env*", "*.key"]
+  }
+}

@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Logs
+*.log
+coverage/
+
+# Local runtime artifacts
+.gg-worktrees/
+.local/
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Environment/secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+id_rsa
+id_ed25519
+
+# gg local state
+*.sqlite
+*.db
