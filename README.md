@@ -58,6 +58,7 @@ gg config leaderboard true
 
 - User config: `~/.config/gg/gg.toml` or local `./gg.toml`
 - Repo config: `./gg.config.json`
+- `gg.toml` tip: set `gg.default_time_limit = 0` for unlimited matches by default.
 
 Example files are included in this repository.
 

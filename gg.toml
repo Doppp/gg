@@ -1,6 +1,7 @@
 [gg]
 theme = "dark"
 default_time_limit = 600
+# Set to 0 for no time limit.
 worktree_dir = ".gg-worktrees"
 
 [agents.claude]

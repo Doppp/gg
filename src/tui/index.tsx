@@ -96,7 +96,9 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
   const [selectedAgentProviders, setSelectedAgentProviders] = useState<string[]>([]);
-  const [timeLimitSeconds, setTimeLimitSeconds] = useState(DEFAULT_CONFIG.gg.default_time_limit);
+  const [timeLimitSeconds, setTimeLimitSeconds] = useState<number | null>(
+    DEFAULT_CONFIG.gg.default_time_limit > 0 ? DEFAULT_CONFIG.gg.default_time_limit : null
+  );
 
   const [baseBranch, setBaseBranch] = useState("main");
   const [repoIsClean, setRepoIsClean] = useState(true);
@@ -216,7 +218,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
 
         setConfig(loadedConfig);
         setRepoConfig(loadedRepoConfig);
-        setTimeLimitSeconds(loadedConfig.gg.default_time_limit);
+        setTimeLimitSeconds(loadedConfig.gg.default_time_limit > 0 ? loadedConfig.gg.default_time_limit : null);
         setDetectedAgents(availableAgents);
         setSelectedAgentProviders(availableAgents.slice(0, 2).map((item) => item.provider));
         setBaseBranch(validation.currentBranch || "main");
@@ -328,7 +330,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         {
           prompt,
           providers: selectedAgentProviders,
-          timeLimitSeconds,
+          timeLimitSeconds: timeLimitSeconds ?? undefined,
           privacy: config.leaderboard.default_privacy
         },
         {
@@ -715,7 +717,11 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         </Text>
         <Text dimColor>[1]Setup [2]Live [3]Stats [4]Thread [5]Leaderboard [6]History [7]Profile [?]Help [q]Quit</Text>
         <Text dimColor>
-          Default time limit: {Math.floor(config.gg.default_time_limit / 60)} min | Selected agents: {selectedAgentProviders.length}
+          Default time limit:{" "}
+          {config.gg.default_time_limit > 0
+            ? `${Math.floor(config.gg.default_time_limit / 60)} min`
+            : "none (unlimited)"}{" "}
+          | Selected agents: {selectedAgentProviders.length}
         </Text>
         {h2hSummary ? <Text dimColor>{h2hSummary}</Text> : null}
         {warnings.map((warning, index) => (

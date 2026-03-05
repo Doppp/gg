@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 
 const HELP_ROWS: Array<[string, string]> = [
   ["1-7", "switch views"],
+  ["Tab / Shift+Tab", "next/prev setup focus"],
   ["q / Ctrl+C", "quit"],
   ["Enter", "select / confirm"],
   ["Esc", "back / close overlay"],

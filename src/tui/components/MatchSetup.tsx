@@ -13,11 +13,11 @@ interface MatchSetupProps {
   isEditingPrompt: boolean;
   selectedAgentProviders: string[];
   availableAgents: SetupAgentOption[];
-  timeLimitSeconds: number;
+  timeLimitSeconds: number | null;
   onPromptChange: (prompt: string) => void;
   onSetPromptEditing: (editing: boolean) => void;
   onToggleAgent: (provider: string) => void;
-  onTimeLimitChange: (seconds: number) => void;
+  onTimeLimitChange: (seconds: number | null) => void;
 }
 
 const MIN_TIME_LIMIT = 60;
@@ -80,7 +80,11 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
       }
 
       if (key.tab) {
-        setFocusIndex((current) => (current + 1) % 3);
+        if (key.shift) {
+          setFocusIndex((current) => (current - 1 + 3) % 3);
+        } else {
+          setFocusIndex((current) => (current + 1) % 3);
+        }
         return;
       }
 
@@ -122,12 +126,27 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
       }
 
       if (focusIndex === 2 && (key.leftArrow || input === "-")) {
-        onTimeLimitChange(Math.max(MIN_TIME_LIMIT, timeLimitSeconds - 60));
+        if (timeLimitSeconds === null) {
+          onTimeLimitChange(null);
+        } else if (timeLimitSeconds <= MIN_TIME_LIMIT) {
+          onTimeLimitChange(null);
+        } else {
+          onTimeLimitChange(Math.max(MIN_TIME_LIMIT, timeLimitSeconds - 60));
+        }
         return;
       }
 
       if (focusIndex === 2 && (key.rightArrow || input === "+")) {
-        onTimeLimitChange(Math.min(MAX_TIME_LIMIT, timeLimitSeconds + 60));
+        if (timeLimitSeconds === null) {
+          onTimeLimitChange(MIN_TIME_LIMIT);
+        } else {
+          onTimeLimitChange(Math.min(MAX_TIME_LIMIT, timeLimitSeconds + 60));
+        }
+        return;
+      }
+
+      if (focusIndex === 2 && input.toLowerCase() === "t") {
+        onTimeLimitChange(timeLimitSeconds === null ? MIN_TIME_LIMIT : null);
       }
     },
     { isActive }
@@ -167,8 +186,12 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
 
       <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 2 ? "green" : "gray"} paddingX={1} flexDirection="column">
         <Text>{focusIndex === 2 ? ">" : " "} Time Limit</Text>
-        <Text>{Math.floor(timeLimitSeconds / 60)} min ({timeLimitSeconds}s)</Text>
-        <Text dimColor>Use left/right arrows or +/- to adjust</Text>
+        <Text>
+          {timeLimitSeconds === null
+            ? "none (unlimited)"
+            : `${Math.floor(timeLimitSeconds / 60)} min (${timeLimitSeconds}s)`}
+        </Text>
+        <Text dimColor>Use left/right or +/- to adjust | t toggle unlimited</Text>
       </Box>
     </Box>
   );
