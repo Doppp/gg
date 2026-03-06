@@ -5,7 +5,8 @@ export const claudeExecutor: AgentExecutor = {
   provider: "claude",
   async spawn(entry, options, handlers) {
     const command = options.command ?? "claude";
-    const args = options.args ?? ["--dangerously-skip-permissions", "-p", options.prompt];
+    const baseArgs = options.args ?? ["--dangerously-skip-permissions"];
+    const args = baseArgs.includes("-p") ? baseArgs : [...baseArgs, "-p", options.prompt];
 
     const subprocess = execa(command, args, {
       cwd: entry.worktreePath,

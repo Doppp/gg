@@ -42,7 +42,7 @@ npm test
 ```bash
 gg
 gg --repo /path/to/repo
-gg run "add dark mode toggle" --agents claude codex
+gg run "add dark mode toggle" --agents claude codex --base new --theme dark-mode --strategy competition
 gg stats
 gg leaderboard
 gg history
@@ -53,6 +53,14 @@ gg clean
 gg config allowSecrets true
 gg config leaderboard true
 ```
+
+Headless `run` flags:
+
+- `--base current|new`
+- `--theme <short-branch-theme>`
+- `--strategy plain|competition`
+- `--time-limit <seconds>`
+- `--privacy public|private|anonymous`
 
 ## Interactive Review
 
@@ -88,6 +96,35 @@ Setup includes a prompt-strategy control:
 - `competition`: prepend a judging-focused head-to-head instruction before the user prompt
 
 The original prompt remains the visible match prompt in the UI and stored match metadata. The expanded prompt is what gets sent to executors and is recorded separately in match threads.
+
+## E2E Testing
+
+Automated smoke coverage is now available for the real headless CLI flow:
+
+```bash
+npm run test:e2e
+```
+
+That scenario spins up:
+
+- a disposable git repo
+- fake `claude` and `codex` executables on `PATH`
+- a real `gg run` headless match
+- real worktrees, checks, logs, threads, and SQLite persistence
+
+If you want to watch the flow outside Vitest:
+
+```bash
+npm run demo:e2e
+```
+
+Optional:
+
+```bash
+GG_KEEP_E2E_TMP=1 npm run demo:e2e
+```
+
+That keeps the temporary repo/home directory on disk so you can inspect the generated artifacts afterward.
 
 ## Config files
 

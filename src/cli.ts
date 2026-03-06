@@ -9,6 +9,7 @@ import { loadConfig, loadRepoConfig } from "./config/config.js";
 import { isGitRepository } from "./lib/git.js";
 import { MatchEngine } from "./match/engine.js";
 import { readThreadFromFile } from "./match/thread.js";
+import type { BaseBranchMode, PromptStrategy } from "./match/types.js";
 import { cleanRecoveryState, scanRecoveryState } from "./recovery/recovery.js";
 import {
   getAgentProfile,
@@ -24,7 +25,7 @@ function printHelp(): void {
   process.stdout.write(`gg - Good game. Every time.\n\n`);
   process.stdout.write(`Usage:\n`);
   process.stdout.write(`  gg [--repo /path/to/repo]\n`);
-  process.stdout.write(`  gg run \"<prompt>\" --agents claude codex\n`);
+  process.stdout.write(`  gg run \"<prompt>\" --agents claude codex [--base current|new] [--theme short-name] [--strategy plain|competition]\n`);
   process.stdout.write(`  gg stats\n`);
   process.stdout.write(`  gg leaderboard\n`);
   process.stdout.write(`  gg history\n`);
@@ -34,6 +35,14 @@ function printHelp(): void {
   process.stdout.write(`  gg clean\n`);
   process.stdout.write(`  gg config allowSecrets true\n`);
   process.stdout.write(`  gg config leaderboard true\n`);
+}
+
+interface HeadlessRunOverrides {
+  timeLimitSeconds?: number;
+  privacy?: "public" | "private" | "anonymous";
+  promptStrategy?: PromptStrategy;
+  baseBranchMode?: BaseBranchMode;
+  baseBranchTheme?: string;
 }
 
 function resolveRepoPath(argv: minimist.ParsedArgs): string {
@@ -87,7 +96,12 @@ function updateLocalConfig(repoPath: string, key: string, value: string): void {
   fs.writeFileSync(configPath, next, "utf8");
 }
 
-async function runHeadless(repoPath: string, prompt: string, providers: string[]): Promise<void> {
+async function runHeadless(
+  repoPath: string,
+  prompt: string,
+  providers: string[],
+  overrides: HeadlessRunOverrides = {}
+): Promise<void> {
   const config = loadConfig(repoPath);
   const repoConfig = loadRepoConfig(repoPath);
   const db = openDatabase();
@@ -103,10 +117,12 @@ async function runHeadless(repoPath: string, prompt: string, providers: string[]
 
     const match = await engine.startMatch({
       prompt,
-      promptStrategy: config.gg.default_prompt_strategy,
+      promptStrategy: overrides.promptStrategy ?? config.gg.default_prompt_strategy,
+      baseBranchMode: overrides.baseBranchMode,
+      baseBranchTheme: overrides.baseBranchTheme,
       providers,
-      timeLimitSeconds: config.gg.default_time_limit,
-      privacy: config.leaderboard.default_privacy
+      timeLimitSeconds: overrides.timeLimitSeconds ?? config.gg.default_time_limit,
+      privacy: overrides.privacy ?? config.leaderboard.default_privacy
     });
 
     process.stdout.write(`Started match ${match.id}\n`);
@@ -125,9 +141,61 @@ async function runHeadless(repoPath: string, prompt: string, providers: string[]
   }
 }
 
+function parsePromptStrategy(value: unknown): PromptStrategy | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "plain" || normalized === "competition") {
+    return normalized;
+  }
+
+  throw new Error("Prompt strategy must be 'plain' or 'competition'.");
+}
+
+function parseBaseBranchMode(value: unknown): BaseBranchMode | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "current" || normalized === "new") {
+    return normalized;
+  }
+
+  throw new Error("Base branch mode must be 'current' or 'new'.");
+}
+
+function parsePrivacy(value: unknown): "public" | "private" | "anonymous" | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === "public" || normalized === "private" || normalized === "anonymous") {
+    return normalized;
+  }
+
+  throw new Error("Privacy must be 'public', 'private', or 'anonymous'.");
+}
+
+function parseTimeLimit(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("Time limit must be a non-negative number of seconds.");
+  }
+
+  return parsed;
+}
+
 async function run(): Promise<void> {
   const argv = minimist(process.argv.slice(2), {
-    string: ["repo", "agents"],
+    string: ["repo", "agents", "base", "theme", "strategy", "privacy", "time-limit"],
     boolean: ["help"],
     alias: {
       h: "help"
@@ -154,6 +222,11 @@ async function run(): Promise<void> {
   if (subcommand === "run") {
     const prompt = String(argv._[1] ?? "").trim();
     const providers = parseAgentsArg(argv.agents);
+    const promptStrategy = parsePromptStrategy(argv.strategy);
+    const baseBranchMode = parseBaseBranchMode(argv.base);
+    const privacy = parsePrivacy(argv.privacy);
+    const timeLimitSeconds = parseTimeLimit(argv["time-limit"]);
+    const baseBranchTheme = typeof argv.theme === "string" ? argv.theme.trim() : undefined;
 
     if (prompt.length === 0) {
       throw new Error("Prompt is required: gg run \"<prompt>\" --agents claude codex");
@@ -162,7 +235,13 @@ async function run(): Promise<void> {
       throw new Error("At least two agents are required for headless run.");
     }
 
-    await runHeadless(repoPath, prompt, providers);
+    await runHeadless(repoPath, prompt, providers, {
+      promptStrategy,
+      baseBranchMode,
+      baseBranchTheme: baseBranchTheme && baseBranchTheme.length > 0 ? baseBranchTheme : undefined,
+      timeLimitSeconds,
+      privacy
+    });
     return;
   }
 

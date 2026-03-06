@@ -5,7 +5,8 @@ export const codexExecutor: AgentExecutor = {
   provider: "codex",
   async spawn(entry, options, handlers) {
     const command = options.command ?? "codex";
-    const args = options.args ?? ["--prompt", options.prompt];
+    const baseArgs = options.args ?? [];
+    const args = baseArgs.includes("--prompt") ? baseArgs : [...baseArgs, "--prompt", options.prompt];
 
     const subprocess = execa(command, args, {
       cwd: entry.worktreePath,
