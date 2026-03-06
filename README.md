@@ -151,6 +151,19 @@ Notes:
 - `npm test` excludes the TUI smoke test because PTY transcript checks are slower and more environment-sensitive than the default suite.
 - The TUI smoke test is a scripted automation mode intended for end-to-end verification. It is not asserting arbitrary user keystrokes one-by-one.
 
+For a real-agent disposable demo that uses your installed `claude` and `codex` CLIs against a tiny JS repo:
+
+```bash
+npm run demo:e2e:real -- --live --scenario multiply --keep
+```
+
+Notes:
+
+- `--live` is required because this will use your real agent accounts and may incur cost.
+- The demo creates a throwaway repo with built-in Node tests and streams both agents' output live.
+- `--keep` leaves the temp repo and artifact directory on disk so you can inspect the resulting worktrees, logs, and threads.
+- You can swap scenarios with `multiply`, `title-case`, or `clamp`, or pass `--prompt "..."` to use your own short test prompt.
+
 ## Config files
 
 - User config: `~/.config/gg/gg.toml` or local `./gg.toml`

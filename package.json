@@ -22,7 +22,8 @@
     "test:e2e": "vitest run test/e2e-cli.test.ts",
     "test:e2e:tui": "npm run build && vitest run test/tui-e2e.test.ts",
     "demo:e2e": "tsx scripts/e2e-smoke.ts",
-    "demo:e2e:tui": "npm run build && tsx scripts/e2e-tui-smoke.ts"
+    "demo:e2e:tui": "npm run build && tsx scripts/e2e-tui-smoke.ts",
+    "demo:e2e:real": "tsx scripts/e2e-real-agents.ts"
   },
   "engines": {
     "node": ">=20"
