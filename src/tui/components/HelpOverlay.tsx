@@ -9,6 +9,7 @@ const HELP_ROWS: Array<[string, string]> = [
   ["Enter", "select / confirm"],
   ["Esc", "back / close overlay"],
   ["Space", "start match (from setup)"],
+  ["p", "toggle competition prompt (setup)"],
   ["x", "stop all agents early"],
   ["d", "show git diff"],
   ["b", "preview branch"],

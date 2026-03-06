@@ -20,6 +20,8 @@ export interface WatcherHandle {
 export interface SafetyWatcherOptions {
   blockedSecretPatterns?: readonly string[];
   guardRules?: GuardRules;
+  mode?: "native" | "polling";
+  pollIntervalMs?: number;
   onViolation: (violation: SafetyViolation) => void;
 }
 
@@ -79,97 +81,132 @@ function createViolationEmitter(rootPath: string, options: SafetyWatcherOptions)
   };
 }
 
-function createFallbackWatchers(rootPath: string, onEvent: (eventType: string, relativePath: string) => void): fs.FSWatcher[] {
-  const watchers: fs.FSWatcher[] = [];
-  const visited = new Set<string>();
+function snapshotFiles(rootPath: string): Map<string, string> {
+  const snapshot = new Map<string, string>();
+  const pending = [rootPath];
 
-  const watchDir = (directory: string): void => {
-    const resolved = path.resolve(directory);
-    if (visited.has(resolved)) {
-      return;
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (!current) {
+      continue;
     }
 
-    visited.add(resolved);
-
-    let watcher: fs.FSWatcher;
+    let entries: fs.Dirent[];
     try {
-      watcher = fs.watch(resolved, (eventType, filename) => {
-        if (!filename) {
-          return;
-        }
-
-        const absolutePath = path.join(resolved, String(filename));
-        const relativePath = path.relative(rootPath, absolutePath);
-        onEvent(eventType, relativePath);
-
-        if (eventType === "rename" && fs.existsSync(absolutePath)) {
-          try {
-            if (fs.statSync(absolutePath).isDirectory()) {
-              watchDir(absolutePath);
-            }
-          } catch {
-            // Ignore race conditions where the path is removed before stat.
-          }
-        }
-      });
-      watchers.push(watcher);
+      entries = fs.readdirSync(current, { withFileTypes: true });
     } catch {
-      return;
+      continue;
     }
 
-    const entries = fs.readdirSync(resolved, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.isDirectory()) {
+      const absolutePath = path.join(current, entry.name);
+      const relativePath = normalizePathForMatch(path.relative(rootPath, absolutePath));
+
+      if (relativePath.length > 0 && shouldIgnorePath(relativePath)) {
         continue;
       }
-      if (entry.name === ".git" || entry.name === "node_modules") {
+
+      if (entry.isDirectory()) {
+        pending.push(absolutePath);
         continue;
       }
-      watchDir(path.join(resolved, entry.name));
+
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      try {
+        const stat = fs.statSync(absolutePath);
+        snapshot.set(relativePath, `${stat.mtimeMs}:${stat.size}`);
+      } catch {
+        // Ignore files that disappear mid-scan.
+      }
+    }
+  }
+
+  return snapshot;
+}
+
+function createPollingWatcher(
+  rootPath: string,
+  onEvent: (eventType: string, relativePath: string) => void,
+  pollIntervalMs: number
+): { close: () => void } {
+  let previous = snapshotFiles(rootPath);
+  const timer = setInterval(() => {
+    const current = snapshotFiles(rootPath);
+
+    for (const [relativePath, signature] of current.entries()) {
+      if (previous.get(relativePath) !== signature) {
+        onEvent("change", relativePath);
+      }
+    }
+
+    previous = current;
+  }, pollIntervalMs);
+
+  timer.unref?.();
+
+  return {
+    close: () => {
+      clearInterval(timer);
     }
   };
-
-  watchDir(rootPath);
-  return watchers;
 }
 
 export function createSafetyWatcher(rootPath: string, options: SafetyWatcherOptions): WatcherHandle {
   const active = { closed: false };
   const emitViolation = createViolationEmitter(rootPath, options);
-  const watchers: fs.FSWatcher[] = [];
+  const polling = options.mode === "polling";
 
-  try {
-    const watcher = fs.watch(
-      rootPath,
-      {
-        recursive: true,
-        persistent: true
-      },
-      (eventType, filename) => {
-        if (active.closed || !filename) {
-          return;
+  if (!polling) {
+    try {
+      const watcher = fs.watch(
+        rootPath,
+        {
+          recursive: true,
+          persistent: true
+        },
+        (eventType, filename) => {
+          if (active.closed || !filename) {
+            return;
+          }
+          emitViolation(eventType, String(filename));
         }
-        emitViolation(eventType, String(filename));
-      }
-    );
-    watchers.push(watcher);
-  } catch {
-    watchers.push(
-      ...createFallbackWatchers(rootPath, (eventType, relativePath) => {
+      );
+
+      watcher.on("error", () => {
         if (active.closed) {
           return;
         }
-        emitViolation(eventType, relativePath);
-      })
-    );
+      });
+
+      return {
+        close: () => {
+          active.closed = true;
+          watcher.close();
+        }
+      };
+    } catch {
+      // Fall back to polling below.
+    }
   }
+
+  const fallback = createPollingWatcher(
+    rootPath,
+    (eventType, relativePath) => {
+      if (active.closed) {
+        return;
+      }
+      emitViolation(eventType, relativePath);
+    },
+    options.pollIntervalMs ?? 150
+  );
 
   return {
     close: () => {
       active.closed = true;
-      for (const watcher of watchers) {
-        watcher.close();
-      }
+      fallback.close();
     }
   };
 }

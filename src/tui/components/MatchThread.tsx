@@ -9,6 +9,7 @@ interface MatchThreadProps {
 
 function icon(type: string): string {
   if (type === "prompt") return "P";
+  if (type === "effective_prompt") return "E";
   if (type === "agent_started") return ">";
   if (type === "stdout") return ".";
   if (type === "stderr") return "!";
@@ -31,6 +32,10 @@ function renderEvent(event: MatchThreadType["events"][number]): string {
 
   if (event.type === "prompt") {
     return `${ts} ${icon(event.type)} ${event.content}`;
+  }
+
+  if (event.type === "effective_prompt") {
+    return `${ts} ${icon(event.type)} strategy=${event.strategy} ${event.content}`;
   }
 
   if (event.type === "agent_started") {

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import type { PromptStrategy } from "../../match/types.js";
 import { theme } from "../theme.js";
 
 export interface SetupAgentOption {
@@ -11,6 +12,7 @@ export interface SetupAgentOption {
 interface MatchSetupProps {
   isActive: boolean;
   prompt: string;
+  promptStrategy: PromptStrategy;
   isEditingPrompt: boolean;
   selectedAgentProviders: string[];
   availableAgents: SetupAgentOption[];
@@ -19,15 +21,18 @@ interface MatchSetupProps {
   onSetPromptEditing: (editing: boolean) => void;
   onToggleAgent: (provider: string) => void;
   onTimeLimitChange: (seconds: number | null) => void;
+  onPromptStrategyChange: (strategy: PromptStrategy) => void;
 }
 
 const MIN_TIME_LIMIT = 60;
 const MAX_TIME_LIMIT = 7200;
+const SECTION_COUNT = 4;
 
 export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
   const {
     isActive,
     prompt,
+    promptStrategy,
     isEditingPrompt,
     selectedAgentProviders,
     availableAgents,
@@ -35,7 +40,8 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
     onPromptChange,
     onSetPromptEditing,
     onToggleAgent,
-    onTimeLimitChange
+    onTimeLimitChange,
+    onPromptStrategyChange
   } = props;
 
   const [focusIndex, setFocusIndex] = useState(0);
@@ -82,9 +88,9 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
 
       if (key.tab) {
         if (key.shift) {
-          setFocusIndex((current) => (current - 1 + 3) % 3);
+          setFocusIndex((current) => (current - 1 + SECTION_COUNT) % SECTION_COUNT);
         } else {
-          setFocusIndex((current) => (current + 1) % 3);
+          setFocusIndex((current) => (current + 1) % SECTION_COUNT);
         }
         return;
       }
@@ -99,11 +105,11 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
       }
 
       if (focusIndex !== 1 && key.upArrow) {
-        setFocusIndex((current) => (current - 1 + 3) % 3);
+        setFocusIndex((current) => (current - 1 + SECTION_COUNT) % SECTION_COUNT);
         return;
       }
       if (focusIndex !== 1 && key.downArrow) {
-        setFocusIndex((current) => (current + 1) % 3);
+        setFocusIndex((current) => (current + 1) % SECTION_COUNT);
         return;
       }
 
@@ -148,6 +154,11 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
 
       if (focusIndex === 2 && input.toLowerCase() === "t") {
         onTimeLimitChange(timeLimitSeconds === null ? MIN_TIME_LIMIT : null);
+        return;
+      }
+
+      if (focusIndex === 3 && (key.leftArrow || key.rightArrow || input.toLowerCase() === "p")) {
+        onPromptStrategyChange(promptStrategy === "plain" ? "competition" : "plain");
       }
     },
     { isActive }
@@ -198,6 +209,17 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
             : `${Math.floor(timeLimitSeconds / 60)} min (${timeLimitSeconds}s)`}
         </Text>
         <Text color={theme.muted}>Use left/right or +/- to adjust | t toggle unlimited</Text>
+      </Box>
+
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 3 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 3 ? theme.focus : undefined}>{focusIndex === 3 ? ">" : " "} Prompt Strategy</Text>
+        <Text color={promptStrategy === "competition" ? theme.warning : undefined}>{promptStrategy}</Text>
+        <Text color={theme.muted}>
+          {promptStrategy === "plain"
+            ? "Send the user prompt as-is."
+            : "Prepend a competition framing prompt before the user prompt."}
+        </Text>
+        <Text color={theme.muted}>Use left/right or p to toggle</Text>
       </Box>
     </Box>
   );

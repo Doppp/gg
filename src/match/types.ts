@@ -6,9 +6,13 @@ export interface CheckResult {
 
 export type CheckResults = Record<string, CheckResult[]>;
 
+export type PromptStrategy = "plain" | "competition";
+
 export interface Match {
   id: string; // e.g. "match_20260305_1530"
   prompt: string;
+  effectivePrompt: string;
+  promptStrategy: PromptStrategy;
   repo: string; // Absolute path to the git repo
   baseBranch: string; // Branch match started from
   agents: AgentEntry[];
@@ -111,11 +115,14 @@ export interface MatchThread {
   agentId: string;
   provider: string;
   prompt: string;
+  effectivePrompt: string;
+  promptStrategy: PromptStrategy;
   events: ThreadEvent[];
 }
 
 export type ThreadEvent =
   | { type: "prompt"; timestamp: string; content: string }
+  | { type: "effective_prompt"; timestamp: string; content: string; strategy: PromptStrategy }
   | { type: "agent_started"; timestamp: string; pid: number }
   | { type: "stdout"; timestamp: string; content: string }
   | { type: "stderr"; timestamp: string; content: string }

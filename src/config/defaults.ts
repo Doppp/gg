@@ -4,6 +4,7 @@ export interface GGSectionConfig {
   theme: "dark" | "light";
   default_time_limit: number;
   worktree_dir: string;
+  default_prompt_strategy: "plain" | "competition";
 }
 
 export interface AgentConfig {
@@ -42,7 +43,8 @@ export const DEFAULT_CONFIG: GGConfig = {
   gg: {
     theme: "dark",
     default_time_limit: 600,
-    worktree_dir: ".gg-worktrees"
+    worktree_dir: ".gg-worktrees",
+    default_prompt_strategy: "plain"
   },
   agents: {
     claude: {

@@ -3,6 +3,8 @@ theme = "dark"
 default_time_limit = 600
 # Set to 0 for no time limit.
 worktree_dir = ".gg-worktrees"
+# Use "competition" to prepend a judging-focused head-to-head instruction.
+default_prompt_strategy = "plain"
 
 [agents.claude]
 enabled = true

@@ -66,11 +66,21 @@ After a match completes (Post-Match view):
 
 Commands come from `gg.config.json > review` (with `u` falling back to the first `checks` entry if needed).
 
+## Prompt Strategy
+
+Setup includes a prompt-strategy control:
+
+- `plain`: send the user's prompt as-is
+- `competition`: prepend a judging-focused head-to-head instruction before the user prompt
+
+The original prompt remains the visible match prompt in the UI and stored match metadata. The expanded prompt is what gets sent to executors and is recorded separately in match threads.
+
 ## Config files
 
 - User config: `~/.config/gg/gg.toml` or local `./gg.toml`
 - Repo config: `./gg.config.json`
 - `gg.toml` tip: set `gg.default_time_limit = 0` for unlimited matches by default.
+- `gg.toml` tip: set `gg.default_prompt_strategy = "competition"` to make competition framing the default.
 
 Example files are included in this repository.
 

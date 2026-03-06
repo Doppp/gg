@@ -103,6 +103,7 @@ async function runHeadless(repoPath: string, prompt: string, providers: string[]
 
     const match = await engine.startMatch({
       prompt,
+      promptStrategy: config.gg.default_prompt_strategy,
       providers,
       timeLimitSeconds: config.gg.default_time_limit,
       privacy: config.leaderboard.default_privacy

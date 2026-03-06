@@ -24,6 +24,8 @@ function createMockMatch(repoPath: string): Match {
   return {
     id: "match_20260305_1000",
     prompt: "build feature",
+    effectivePrompt: "build feature",
+    promptStrategy: "plain",
     repo: repoPath,
     baseBranch: "main",
     status: "reviewing",

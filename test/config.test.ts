@@ -32,6 +32,7 @@ describe("loadConfig", () => {
       [
         "[gg]",
         "default_time_limit = 900",
+        "default_prompt_strategy = \"competition\"",
         "",
         "[agents.codex]",
         "enabled = true",
@@ -46,6 +47,7 @@ describe("loadConfig", () => {
     const config = loadConfig(repoPath);
 
     expect(config.gg.default_time_limit).toBe(900);
+    expect(config.gg.default_prompt_strategy).toBe("competition");
     expect(config.agents.codex.api_key).toBe("sk-test-key");
   });
 });

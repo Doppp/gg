@@ -37,12 +37,15 @@ describe("safety watcher", () => {
 
     const violations: SafetyViolation[] = [];
     const watcher = createSafetyWatcher(root, {
+      mode: "polling",
+      pollIntervalMs: 50,
       guardRules: normalizeGuardRules({ allow: ["src/components/*"], deny: ["src/auth/*"] }),
       onViolation: (violation) => {
         violations.push(violation);
       }
     });
 
+    await delay(80);
     fs.writeFileSync(path.join(root, "src", "auth", "middleware.ts"), "export const x = 1;\n", "utf8");
     await delay(120);
     fs.appendFileSync(path.join(root, "src", "auth", "middleware.ts"), "export const y = 2;\n", "utf8");

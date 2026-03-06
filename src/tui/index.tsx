@@ -9,7 +9,7 @@ import { DEFAULT_CONFIG, type GGConfig } from "../config/defaults.js";
 import { getRepoName, validateRepo } from "../lib/git.js";
 import { MatchEngine } from "../match/engine.js";
 import { readThreadFromFile } from "../match/thread.js";
-import type { AgentEntry, Match, MatchThread as MatchThreadType } from "../match/types.js";
+import type { AgentEntry, Match, MatchThread as MatchThreadType, PromptStrategy } from "../match/types.js";
 import { diffBranches } from "../preview/diff.js";
 import { switchPreviewBranch } from "../preview/worktree.js";
 import { scanRecoveryState } from "../recovery/recovery.js";
@@ -96,6 +96,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [prompt, setPrompt] = useState("");
+  const [promptStrategy, setPromptStrategy] = useState<PromptStrategy>(DEFAULT_CONFIG.gg.default_prompt_strategy);
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
   const [selectedAgentProviders, setSelectedAgentProviders] = useState<string[]>([]);
   const [timeLimitSeconds, setTimeLimitSeconds] = useState<number | null>(
@@ -223,6 +224,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         setConfig(loadedConfig);
         setRepoConfig(loadedRepoConfig);
         setTimeLimitSeconds(loadedConfig.gg.default_time_limit > 0 ? loadedConfig.gg.default_time_limit : null);
+        setPromptStrategy(loadedConfig.gg.default_prompt_strategy);
         setDetectedAgents(availableAgents);
         setSelectedAgentProviders(availableAgents.slice(0, 2).map((item) => item.provider));
         setBaseBranch(validation.currentBranch || "main");
@@ -468,6 +470,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       const started = await engine.startMatch(
         {
           prompt,
+          promptStrategy,
           providers: selectedAgentProviders,
           timeLimitSeconds: timeLimitSeconds ?? undefined,
           privacy: config.leaderboard.default_privacy
@@ -814,6 +817,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         <MatchSetup
           isActive={!showHelp}
           prompt={prompt}
+          promptStrategy={promptStrategy}
           isEditingPrompt={isEditingPrompt}
           selectedAgentProviders={selectedAgentProviders}
           availableAgents={detectedAgents}
@@ -822,6 +826,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
           onSetPromptEditing={setIsEditingPrompt}
           onToggleAgent={toggleAgent}
           onTimeLimitChange={setTimeLimitSeconds}
+          onPromptStrategyChange={setPromptStrategy}
         />
       );
     }
@@ -898,7 +903,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
           {config.gg.default_time_limit > 0
             ? `${Math.floor(config.gg.default_time_limit / 60)} min`
             : "none (unlimited)"}{" "}
-          | Selected agents: {selectedAgentProviders.length}
+          | Prompt strategy: {promptStrategy} | Selected agents: {selectedAgentProviders.length}
         </Text>
         {h2hSummary ? <Text color={theme.muted}>{h2hSummary}</Text> : null}
         {warnings.map((warning, index) => (

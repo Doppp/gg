@@ -11,6 +11,7 @@ import { applyPrivacy } from "../leaderboard/privacy.js";
 import { writeMatchRecord } from "../leaderboard/exporter.js";
 import { cleanupMatchWorkspaces, createAgentWorkspace, createMatchId, slugifyPrompt } from "./branch.js";
 import { runChecks } from "./checks.js";
+import { buildEffectivePrompt } from "./prompt.js";
 import {
   buildInitialMatchStats,
   collectGitDiffStats,
@@ -19,7 +20,7 @@ import {
   type RuntimeAgentMetrics
 } from "./stats.js";
 import { ThreadRecorder } from "./thread.js";
-import type { AgentEntry, CheckResult, Match, MatchRecord, ThreadEvent } from "./types.js";
+import type { AgentEntry, CheckResult, Match, MatchRecord, PromptStrategy, ThreadEvent } from "./types.js";
 import { createSafetyWatcher, type SafetyViolation, type WatcherHandle } from "../safety/watcher.js";
 import { normalizeGuardRules } from "../safety/guard.js";
 import { DEFAULT_BLOCKED_SECRET_PATTERNS } from "../safety/secrets.js";
@@ -29,11 +30,13 @@ export interface StartMatchInput {
   providers: string[];
   timeLimitSeconds?: number;
   privacy?: "public" | "private" | "anonymous";
+  promptStrategy?: PromptStrategy;
 }
 
 export interface MatchEngineOptions {
   repoPath: string;
   worktreeDir?: string;
+  matchesDir?: string;
   now?: () => Date;
   executors?: Record<string, AgentExecutor>;
   agentConfigs?: Record<string, AgentConfig>;
@@ -107,6 +110,7 @@ function agentOutcomeFromStatus(status: AgentEntry["status"]): "winner" | "loser
 export class MatchEngine {
   private readonly repoPath: string;
   private readonly worktreeDir: string;
+  private readonly matchesDir: string;
   private readonly now: () => Date;
   private readonly executors: Record<string, AgentExecutor>;
   private readonly agentConfigs: Record<string, AgentConfig>;
@@ -119,6 +123,7 @@ export class MatchEngine {
   constructor(options: MatchEngineOptions) {
     this.repoPath = options.repoPath;
     this.worktreeDir = options.worktreeDir ?? ".gg-worktrees";
+    this.matchesDir = options.matchesDir ?? path.join(os.homedir(), ".local", "share", "gg", "matches");
     this.now = options.now ?? (() => new Date());
     this.executors = {
       ...createDefaultExecutorRegistry(),
@@ -148,11 +153,13 @@ export class MatchEngine {
 
     const matchId = createMatchId(this.now());
     const slug = slugifyPrompt(input.prompt);
+    const promptStrategy = input.promptStrategy ?? "plain";
+    const effectivePrompt = buildEffectivePrompt(input.prompt, promptStrategy);
 
     const git = simpleGit(this.repoPath);
     const baseBranch = (await git.branchLocal()).current;
 
-    const logDir = path.join(os.homedir(), ".local", "share", "gg", "matches", matchId);
+    const logDir = path.join(this.matchesDir, matchId);
     fs.mkdirSync(logDir, { recursive: true });
 
     const createdAgents: AgentEntry[] = [];
@@ -196,6 +203,8 @@ export class MatchEngine {
     const match: Match = {
       id: matchId,
       prompt: input.prompt,
+      effectivePrompt,
+      promptStrategy,
       repo: this.repoPath,
       baseBranch,
       agents: createdAgents,
@@ -230,7 +239,14 @@ export class MatchEngine {
 
     for (const agent of match.agents) {
       const logStream = fs.createWriteStream(agent.logPath, { flags: "a" });
-      const recorder = new ThreadRecorder(match.id, agent.id, agent.provider, match.prompt);
+      const recorder = new ThreadRecorder(
+        match.id,
+        agent.id,
+        agent.provider,
+        match.prompt,
+        match.effectivePrompt,
+        match.promptStrategy
+      );
 
       run.agents.set(agent.id, {
         entry: agent,
@@ -446,7 +462,7 @@ export class MatchEngine {
         .spawn(
           agent,
           {
-            prompt: run.match.prompt,
+            prompt: run.match.effectivePrompt,
             worktreePath: agent.worktreePath,
             logPath: agent.logPath,
             command,

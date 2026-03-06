@@ -18,12 +18,14 @@ afterEach(() => {
   }
 });
 
-function createCommitExecutor(provider: string): AgentExecutor {
+function createCommitExecutor(provider: string, seenPrompts?: string[]): AgentExecutor {
   return {
     provider,
-    async spawn(entry, _options, handlers) {
+    async spawn(entry, options, handlers) {
       let killed = false;
       const pid = Math.floor(Math.random() * 10_000) + 1000;
+
+      seenPrompts?.push(options.prompt);
 
       handlers.onStart?.(pid);
 
@@ -76,12 +78,15 @@ describe("match engine", () => {
     const repoPath = createTempDir("gg-engine-run-");
     tempDirs.push(repoPath);
     initGitRepo(repoPath);
+    const promptsSeen: string[] = [];
+    const matchesDir = path.join(repoPath, ".match-artifacts");
 
     const engine = new MatchEngine({
       repoPath,
+      matchesDir,
       executors: {
-        alpha: createCommitExecutor("alpha"),
-        beta: createCommitExecutor("beta")
+        alpha: createCommitExecutor("alpha", promptsSeen),
+        beta: createCommitExecutor("beta", promptsSeen)
       },
       repoConfig: {
         checks: ["node -e \"process.exit(0)\""]
@@ -98,9 +103,12 @@ describe("match engine", () => {
     const finished = await engine.waitForMatch(started.id);
 
     expect(finished.status).toBe("reviewing");
+    expect(finished.promptStrategy).toBe("plain");
+    expect(finished.effectivePrompt).toBe("create files");
     expect(finished.stats.agentStats).toHaveLength(2);
     expect(finished.stats.agentStats.every((stat) => stat.filesChanged >= 1)).toBe(true);
     expect(finished.stats.agentStats.every((stat) => stat.commits >= 1)).toBe(true);
+    expect(promptsSeen).toEqual(["create files", "create files"]);
 
     for (const agent of finished.agents) {
       expect(fs.existsSync(agent.logPath)).toBe(true);
@@ -116,13 +124,51 @@ describe("match engine", () => {
     expect(fs.existsSync(mergedFile)).toBe(true);
   });
 
+  it("prepends the competition prompt without replacing the visible user prompt", async () => {
+    const repoPath = createTempDir("gg-engine-competition-");
+    tempDirs.push(repoPath);
+    initGitRepo(repoPath);
+    const promptsSeen: string[] = [];
+    const matchesDir = path.join(repoPath, ".match-artifacts");
+
+    const engine = new MatchEngine({
+      repoPath,
+      matchesDir,
+      executors: {
+        alpha: createCommitExecutor("alpha", promptsSeen),
+        beta: createCommitExecutor("beta", promptsSeen)
+      }
+    });
+
+    const started = await engine.startMatch({
+      prompt: "implement search",
+      promptStrategy: "competition",
+      providers: ["alpha", "beta"],
+      timeLimitSeconds: 30,
+      privacy: "private"
+    });
+
+    const finished = await engine.waitForMatch(started.id);
+
+    expect(finished.prompt).toBe("implement search");
+    expect(finished.promptStrategy).toBe("competition");
+    expect(finished.effectivePrompt).toContain("blind head-to-head coding match");
+    expect(promptsSeen.every((prompt) => prompt.includes("Task:\nimplement search"))).toBe(true);
+
+    const threadRaw = fs.readFileSync(finished.agents[0]!.threadPath, "utf8");
+    expect(threadRaw).toContain("\"type\": \"effective_prompt\"");
+    expect(threadRaw).toContain("\"strategy\": \"competition\"");
+  });
+
   it("times out slow agents and marks timeout status", async () => {
     const repoPath = createTempDir("gg-engine-timeout-");
     tempDirs.push(repoPath);
     initGitRepo(repoPath);
+    const matchesDir = path.join(repoPath, ".match-artifacts");
 
     const engine = new MatchEngine({
       repoPath,
+      matchesDir,
       executors: {
         slowA: createHangingExecutor("slowA"),
         slowB: createHangingExecutor("slowB")
