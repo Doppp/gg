@@ -31,8 +31,16 @@ describe("recovery scanning", () => {
     const dbPath = path.join(repoPath, "recovery-test.db");
     const db = new Database(dbPath);
     db.exec(
-      "CREATE TABLE matches (id TEXT PRIMARY KEY, status TEXT NOT NULL, started_at DATETIME NOT NULL);" +
-        "INSERT INTO matches (id, status, started_at) VALUES ('match_20260305_1530', 'running', datetime('now'));"
+      "CREATE TABLE matches (" +
+        "id TEXT PRIMARY KEY, " +
+        "status TEXT NOT NULL, " +
+        "source_branch TEXT, " +
+        "base_branch TEXT, " +
+        "base_branch_mode TEXT, " +
+        "started_at DATETIME NOT NULL" +
+        ");" +
+        "INSERT INTO matches (id, status, source_branch, base_branch, base_branch_mode, started_at) VALUES " +
+        "('match_20260305_1530', 'running', 'main', 'feat/search-ui', 'new', datetime('now'));"
     );
     db.close();
 
@@ -44,6 +52,10 @@ describe("recovery scanning", () => {
 
     expect(result.danglingBranches).toContain("gg/match_20260305_1530/codex/task");
     expect(result.orphanedWorktrees).toContain(orphanPath);
-    expect(result.unfinishedMatches).toContain("match_20260305_1530");
+    expect(result.unfinishedMatches).toHaveLength(1);
+    expect(result.unfinishedMatches[0]!.id).toBe("match_20260305_1530");
+    expect(result.unfinishedMatches[0]!.sourceBranch).toBe("main");
+    expect(result.unfinishedMatches[0]!.baseBranch).toBe("feat/search-ui");
+    expect(result.unfinishedMatches[0]!.baseBranchMode).toBe("new");
   });
 });

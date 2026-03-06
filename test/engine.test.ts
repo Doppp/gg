@@ -5,7 +5,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentExecutor } from "../src/agents/types.js";
 import { MatchEngine } from "../src/match/engine.js";
-import { createTempDir, initGitRepo } from "./helpers/git.js";
+import { createTempDir, gitOutput, initGitRepo } from "./helpers/git.js";
 
 const tempDirs: string[] = [];
 
@@ -158,6 +158,43 @@ describe("match engine", () => {
     const threadRaw = fs.readFileSync(finished.agents[0]!.threadPath, "utf8");
     expect(threadRaw).toContain("\"type\": \"effective_prompt\"");
     expect(threadRaw).toContain("\"strategy\": \"competition\"");
+  });
+
+  it("can create a named base branch from the current branch without switching the repo during the race", async () => {
+    const repoPath = createTempDir("gg-engine-base-branch-");
+    tempDirs.push(repoPath);
+    initGitRepo(repoPath);
+    const matchesDir = path.join(repoPath, ".match-artifacts");
+
+    const engine = new MatchEngine({
+      repoPath,
+      matchesDir,
+      executors: {
+        alpha: createCommitExecutor("alpha"),
+        beta: createCommitExecutor("beta")
+      }
+    });
+
+    const started = await engine.startMatch({
+      prompt: "implement search",
+      providers: ["alpha", "beta"],
+      baseBranchMode: "new",
+      baseBranchTheme: "search ui",
+      timeLimitSeconds: 30,
+      privacy: "private"
+    });
+
+    expect(started.sourceBranch).toBe("main");
+    expect(started.baseBranchMode).toBe("new");
+    expect(started.baseBranch).toBe("feat/search-ui");
+    expect(gitOutput(repoPath, "git branch --show-current")).toBe("main");
+
+    const finished = await engine.waitForMatch(started.id);
+    expect(gitOutput(repoPath, "git branch --show-current")).toBe("main");
+
+    const merged = await engine.mergeWinner(finished.id, finished.agents[0]!.id);
+    expect(merged.baseBranch).toBe("feat/search-ui");
+    expect(gitOutput(repoPath, "git branch --show-current")).toBe("feat/search-ui");
   });
 
   it("times out slow agents and marks timeout status", async () => {

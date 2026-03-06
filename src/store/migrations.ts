@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS matches (
     id              TEXT PRIMARY KEY,
     prompt          TEXT NOT NULL,
     repo            TEXT NOT NULL,
+    source_branch   TEXT,
     base_branch     TEXT NOT NULL,
+    base_branch_mode TEXT,
     status          TEXT NOT NULL,
     privacy         TEXT NOT NULL DEFAULT 'private',
     started_at      DATETIME NOT NULL,
@@ -74,6 +76,19 @@ CREATE INDEX IF NOT EXISTS idx_match_agents_match ON match_agents(match_id);
 CREATE INDEX IF NOT EXISTS idx_match_agents_provider ON match_agents(provider);
 `;
 
+function hasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === columnName);
+}
+
 export function runMigrations(db: Database.Database): void {
   db.exec(SCHEMA_SQL);
+
+  if (!hasColumn(db, "matches", "source_branch")) {
+    db.exec("ALTER TABLE matches ADD COLUMN source_branch TEXT;");
+  }
+
+  if (!hasColumn(db, "matches", "base_branch_mode")) {
+    db.exec("ALTER TABLE matches ADD COLUMN base_branch_mode TEXT;");
+  }
 }

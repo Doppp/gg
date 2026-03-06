@@ -66,6 +66,20 @@ After a match completes (Post-Match view):
 
 Commands come from `gg.config.json > review` (with `u` falling back to the first `checks` entry if needed).
 
+## Base Branch Flow
+
+Setup now exposes the branch decision instead of assuming the user prepared it manually:
+
+- `Current`: race directly from the current branch
+- `Create new`: create a short `feat/<theme>` branch from the current branch, then fork the agent worktrees from that new base
+
+Notes:
+
+- The branch theme is a short fixed-width field in the setup screen.
+- `gg` keeps the main checkout on the original branch while the match is running.
+- When you pick a winner, `gg` merges that agent into the chosen base branch.
+- Match history and recovery persist both the original source branch and the chosen base-branch mode.
+
 ## Prompt Strategy
 
 Setup includes a prompt-strategy control:

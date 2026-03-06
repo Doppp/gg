@@ -7,6 +7,7 @@ export interface CheckResult {
 export type CheckResults = Record<string, CheckResult[]>;
 
 export type PromptStrategy = "plain" | "competition";
+export type BaseBranchMode = "current" | "new";
 
 export interface Match {
   id: string; // e.g. "match_20260305_1530"
@@ -14,7 +15,9 @@ export interface Match {
   effectivePrompt: string;
   promptStrategy: PromptStrategy;
   repo: string; // Absolute path to the git repo
-  baseBranch: string; // Branch match started from
+  sourceBranch?: string; // Branch user started from
+  baseBranchMode?: BaseBranchMode;
+  baseBranch: string; // Branch agent worktrees were forked from
   agents: AgentEntry[];
   status: MatchStatus;
   startedAt: Date;

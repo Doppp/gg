@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import type { PromptStrategy } from "../../match/types.js";
+import { MAX_BASE_BRANCH_THEME_LENGTH } from "../../match/branch.js";
+import type { BaseBranchMode, PromptStrategy } from "../../match/types.js";
 import { theme } from "../theme.js";
 
 export interface SetupAgentOption {
@@ -11,12 +12,20 @@ export interface SetupAgentOption {
 
 interface MatchSetupProps {
   isActive: boolean;
+  sourceBranch: string;
+  baseBranchMode: BaseBranchMode;
+  branchTheme: string;
+  resolvedBaseBranch: string;
   prompt: string;
   promptStrategy: PromptStrategy;
   isEditingPrompt: boolean;
+  isEditingBranchTheme: boolean;
   selectedAgentProviders: string[];
   availableAgents: SetupAgentOption[];
   timeLimitSeconds: number | null;
+  onBaseBranchModeChange: (mode: BaseBranchMode) => void;
+  onBranchThemeChange: (theme: string) => void;
+  onSetBranchThemeEditing: (editing: boolean) => void;
   onPromptChange: (prompt: string) => void;
   onSetPromptEditing: (editing: boolean) => void;
   onToggleAgent: (provider: string) => void;
@@ -26,17 +35,25 @@ interface MatchSetupProps {
 
 const MIN_TIME_LIMIT = 60;
 const MAX_TIME_LIMIT = 7200;
-const SECTION_COUNT = 4;
+const SECTION_COUNT = 5;
 
 export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
   const {
     isActive,
+    sourceBranch,
+    baseBranchMode,
+    branchTheme,
+    resolvedBaseBranch,
     prompt,
     promptStrategy,
     isEditingPrompt,
+    isEditingBranchTheme,
     selectedAgentProviders,
     availableAgents,
     timeLimitSeconds,
+    onBaseBranchModeChange,
+    onBranchThemeChange,
+    onSetBranchThemeEditing,
     onPromptChange,
     onSetPromptEditing,
     onToggleAgent,
@@ -86,6 +103,21 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         return;
       }
 
+      if (isEditingBranchTheme) {
+        if (key.escape || (key.ctrl && input.toLowerCase() === "s") || key.return) {
+          onSetBranchThemeEditing(false);
+          return;
+        }
+        if (key.backspace || key.delete) {
+          onBranchThemeChange(branchTheme.slice(0, -1));
+          return;
+        }
+        if (input.length > 0) {
+          onBranchThemeChange(`${branchTheme}${input}`.slice(0, MAX_BASE_BRANCH_THEME_LENGTH));
+        }
+        return;
+      }
+
       if (key.tab) {
         if (key.shift) {
           setFocusIndex((current) => (current - 1 + SECTION_COUNT) % SECTION_COUNT);
@@ -95,11 +127,11 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         return;
       }
 
-      if (focusIndex === 1 && availableAgents.length > 0 && (key.upArrow || input === "k")) {
+      if (focusIndex === 2 && availableAgents.length > 0 && (key.upArrow || input === "k")) {
         setAgentCursor((current) => (current - 1 + availableAgents.length) % availableAgents.length);
         return;
       }
-      if (focusIndex === 1 && availableAgents.length > 0 && (key.downArrow || input === "j")) {
+      if (focusIndex === 2 && availableAgents.length > 0 && (key.downArrow || input === "j")) {
         setAgentCursor((current) => (current + 1) % availableAgents.length);
         return;
       }
@@ -118,12 +150,22 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         return;
       }
 
-      if (focusIndex === 1 && input === " " && availableAgents[agentCursor]) {
+      if (focusIndex === 1 && key.return && baseBranchMode === "new") {
+        onSetBranchThemeEditing(true);
+        return;
+      }
+
+      if (focusIndex === 1 && (key.leftArrow || key.rightArrow || input.toLowerCase() === "b")) {
+        onBaseBranchModeChange(baseBranchMode === "current" ? "new" : "current");
+        return;
+      }
+
+      if (focusIndex === 2 && input === " " && availableAgents[agentCursor]) {
         onToggleAgent(availableAgents[agentCursor].provider);
         return;
       }
 
-      if (focusIndex === 1 && input.toLowerCase() === "a") {
+      if (focusIndex === 2 && input.toLowerCase() === "a") {
         for (const agent of availableAgents) {
           if (!selectedAgentProviders.includes(agent.provider)) {
             onToggleAgent(agent.provider);
@@ -132,7 +174,7 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         return;
       }
 
-      if (focusIndex === 2 && (key.leftArrow || input === "-")) {
+      if (focusIndex === 3 && (key.leftArrow || input === "-")) {
         if (timeLimitSeconds === null) {
           onTimeLimitChange(null);
         } else if (timeLimitSeconds <= MIN_TIME_LIMIT) {
@@ -143,7 +185,7 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         return;
       }
 
-      if (focusIndex === 2 && (key.rightArrow || input === "+")) {
+      if (focusIndex === 3 && (key.rightArrow || input === "+")) {
         if (timeLimitSeconds === null) {
           onTimeLimitChange(MIN_TIME_LIMIT);
         } else {
@@ -152,12 +194,12 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         return;
       }
 
-      if (focusIndex === 2 && input.toLowerCase() === "t") {
+      if (focusIndex === 3 && input.toLowerCase() === "t") {
         onTimeLimitChange(timeLimitSeconds === null ? MIN_TIME_LIMIT : null);
         return;
       }
 
-      if (focusIndex === 3 && (key.leftArrow || key.rightArrow || input.toLowerCase() === "p")) {
+      if (focusIndex === 4 && (key.leftArrow || key.rightArrow || input.toLowerCase() === "p")) {
         onPromptStrategyChange(promptStrategy === "plain" ? "competition" : "plain");
       }
     },
@@ -169,7 +211,7 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
       <Text bold color={theme.brand}>
         Match Setup
       </Text>
-      <Text color={theme.muted}>Tab focus | Enter edit prompt | Space start match | 1-7 switch tabs</Text>
+      <Text color={theme.muted}>Tab focus | Enter edit prompt/branch theme | Space start match | 1-7 switch tabs</Text>
 
       <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 0 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
         <Text color={focusIndex === 0 ? theme.focus : undefined}>
@@ -179,13 +221,29 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
       </Box>
 
       <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 1 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
-        <Text color={focusIndex === 1 ? theme.focus : undefined}>{focusIndex === 1 ? ">" : " "} Agents (pick 2+)</Text>
+        <Text color={focusIndex === 1 ? theme.focus : undefined}>{focusIndex === 1 ? ">" : " "} Base Branch</Text>
+        <Text>Current: {sourceBranch}</Text>
+        <Text color={baseBranchMode === "new" ? theme.warning : undefined}>
+          Mode: {baseBranchMode === "current" ? "use current branch" : "create new branch"}
+        </Text>
+        <Text>
+          Theme: [{branchTheme.padEnd(MAX_BASE_BRANCH_THEME_LENGTH, " ")}]
+          {isEditingBranchTheme ? " (editing)" : ""}
+        </Text>
+        <Text>Will race from: {resolvedBaseBranch}</Text>
+        <Text color={theme.muted}>
+          Use left/right or b to toggle | Enter to edit theme when creating a new branch
+        </Text>
+      </Box>
+
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 2 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 2 ? theme.focus : undefined}>{focusIndex === 2 ? ">" : " "} Agents (pick 2+)</Text>
         {availableAgents.length === 0 ? (
           <Text color={theme.warning}>No compatible agents detected. Install `claude` or `codex` CLI.</Text>
         ) : (
           availableAgents.map((agent, index) => {
             const isSelected = selectedAgentProviders.includes(agent.provider);
-            const isCursor = focusIndex === 1 && index === agentCursor;
+            const isCursor = focusIndex === 2 && index === agentCursor;
             return (
               <Text
                 key={`${agent.provider}:${agent.command}`}
@@ -201,8 +259,8 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         </Text>
       </Box>
 
-      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 2 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
-        <Text color={focusIndex === 2 ? theme.focus : undefined}>{focusIndex === 2 ? ">" : " "} Time Limit</Text>
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 3 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 3 ? theme.focus : undefined}>{focusIndex === 3 ? ">" : " "} Time Limit</Text>
         <Text color={timeLimitSeconds === null ? theme.warning : undefined}>
           {timeLimitSeconds === null
             ? "none (unlimited)"
@@ -211,8 +269,8 @@ export function MatchSetup(props: MatchSetupProps): React.JSX.Element {
         <Text color={theme.muted}>Use left/right or +/- to adjust | t toggle unlimited</Text>
       </Box>
 
-      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 3 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
-        <Text color={focusIndex === 3 ? theme.focus : undefined}>{focusIndex === 3 ? ">" : " "} Prompt Strategy</Text>
+      <Box marginTop={1} borderStyle="round" borderColor={focusIndex === 4 ? theme.focus : theme.muted} paddingX={1} flexDirection="column">
+        <Text color={focusIndex === 4 ? theme.focus : undefined}>{focusIndex === 4 ? ">" : " "} Prompt Strategy</Text>
         <Text color={promptStrategy === "competition" ? theme.warning : undefined}>{promptStrategy}</Text>
         <Text color={theme.muted}>
           {promptStrategy === "plain"

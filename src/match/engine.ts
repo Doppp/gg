@@ -9,7 +9,15 @@ import type { AgentConfig } from "../config/defaults.js";
 import { validateRepo } from "../lib/git.js";
 import { applyPrivacy } from "../leaderboard/privacy.js";
 import { writeMatchRecord } from "../leaderboard/exporter.js";
-import { cleanupMatchWorkspaces, createAgentWorkspace, createMatchId, slugifyPrompt } from "./branch.js";
+import {
+  buildUserBaseBranchName,
+  cleanupMatchWorkspaces,
+  createAgentWorkspace,
+  createMatchBaseBranch,
+  createMatchId,
+  slugifyPrompt,
+  suggestBaseBranchTheme
+} from "./branch.js";
 import { runChecks } from "./checks.js";
 import { buildEffectivePrompt } from "./prompt.js";
 import {
@@ -20,7 +28,7 @@ import {
   type RuntimeAgentMetrics
 } from "./stats.js";
 import { ThreadRecorder } from "./thread.js";
-import type { AgentEntry, CheckResult, Match, MatchRecord, PromptStrategy, ThreadEvent } from "./types.js";
+import type { AgentEntry, BaseBranchMode, CheckResult, Match, MatchRecord, PromptStrategy, ThreadEvent } from "./types.js";
 import { createSafetyWatcher, type SafetyViolation, type WatcherHandle } from "../safety/watcher.js";
 import { normalizeGuardRules } from "../safety/guard.js";
 import { DEFAULT_BLOCKED_SECRET_PATTERNS } from "../safety/secrets.js";
@@ -31,6 +39,8 @@ export interface StartMatchInput {
   timeLimitSeconds?: number;
   privacy?: "public" | "private" | "anonymous";
   promptStrategy?: PromptStrategy;
+  baseBranchMode?: BaseBranchMode;
+  baseBranchTheme?: string;
 }
 
 export interface MatchEngineOptions {
@@ -155,9 +165,22 @@ export class MatchEngine {
     const slug = slugifyPrompt(input.prompt);
     const promptStrategy = input.promptStrategy ?? "plain";
     const effectivePrompt = buildEffectivePrompt(input.prompt, promptStrategy);
+    const baseBranchMode = input.baseBranchMode ?? "current";
 
     const git = simpleGit(this.repoPath);
-    const baseBranch = (await git.branchLocal()).current;
+    const sourceBranch = (await git.branchLocal()).current;
+    let baseBranch = sourceBranch;
+    let createdBaseBranch = false;
+
+    if (baseBranchMode === "new") {
+      const created = await createMatchBaseBranch({
+        repoPath: this.repoPath,
+        sourceBranch,
+        theme: input.baseBranchTheme ?? suggestBaseBranchTheme(input.prompt)
+      });
+      baseBranch = created.branch;
+      createdBaseBranch = true;
+    }
 
     const logDir = path.join(this.matchesDir, matchId);
     fs.mkdirSync(logDir, { recursive: true });
@@ -197,6 +220,9 @@ export class MatchEngine {
           worktreePath: agent.worktreePath
         }))
       ).catch(() => undefined);
+      if (createdBaseBranch) {
+        await git.deleteLocalBranch(baseBranch, true).catch(() => undefined);
+      }
       throw error;
     }
 
@@ -206,6 +232,8 @@ export class MatchEngine {
       effectivePrompt,
       promptStrategy,
       repo: this.repoPath,
+      sourceBranch,
+      baseBranchMode,
       baseBranch,
       agents: createdAgents,
       status: "branching",

@@ -27,7 +27,9 @@ function createMockMatch(repoPath: string): Match {
     effectivePrompt: "build feature",
     promptStrategy: "plain",
     repo: repoPath,
-    baseBranch: "main",
+    sourceBranch: "main",
+    baseBranchMode: "new",
+    baseBranch: "feat/build-feature",
     status: "reviewing",
     startedAt,
     endedAt,
@@ -135,6 +137,8 @@ describe("store queries", () => {
       const history = getRecentMatches(db, 10);
       expect(history).toHaveLength(1);
       expect(history[0]!.id).toBe(match.id);
+      expect(history[0]!.sourceBranch).toBe("main");
+      expect(history[0]!.baseBranchMode).toBe("new");
 
       const leaderboard = getLeaderboard(db);
       expect(leaderboard).toHaveLength(2);

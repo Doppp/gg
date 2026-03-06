@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { simpleGit } from "simple-git";
+import type { BaseBranchMode } from "./types.js";
 
 export interface BranchPlan {
   matchId: string;
@@ -23,6 +24,21 @@ export interface CreateAgentWorkspaceInput {
   worktreeDir: string;
 }
 
+export interface CreateMatchBaseBranchInput {
+  repoPath: string;
+  sourceBranch: string;
+  theme: string;
+}
+
+export interface MatchBaseBranch {
+  branch: string;
+  sourceBranch: string;
+  mode: BaseBranchMode;
+  theme: string;
+}
+
+export const MAX_BASE_BRANCH_THEME_LENGTH = 12;
+
 export function createMatchId(now = new Date()): string {
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -41,6 +57,57 @@ export function slugifyPrompt(prompt: string): string {
     .slice(0, 48);
 
   return slug.length > 0 ? slug : "task";
+}
+
+export function slugifyBaseBranchTheme(theme: string): string {
+  const slug = theme
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, MAX_BASE_BRANCH_THEME_LENGTH);
+
+  return slug.length > 0 ? slug : "task";
+}
+
+export function suggestBaseBranchTheme(prompt: string): string {
+  return slugifyBaseBranchTheme(slugifyPrompt(prompt));
+}
+
+export function buildUserBaseBranchName(theme: string): string {
+  return `feat/${slugifyBaseBranchTheme(theme)}`;
+}
+
+async function resolveUniqueBranchName(repoPath: string, desiredBranch: string): Promise<string> {
+  const git = simpleGit(repoPath);
+  const localBranches = await git.branchLocal();
+  const existing = new Set(localBranches.all);
+
+  if (!existing.has(desiredBranch)) {
+    return desiredBranch;
+  }
+
+  let suffix = 2;
+  while (existing.has(`${desiredBranch}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${desiredBranch}-${suffix}`;
+}
+
+export async function createMatchBaseBranch(input: CreateMatchBaseBranchInput): Promise<MatchBaseBranch> {
+  const git = simpleGit(input.repoPath);
+  const theme = slugifyBaseBranchTheme(input.theme);
+  const branch = await resolveUniqueBranchName(input.repoPath, buildUserBaseBranchName(theme));
+
+  await git.raw(["branch", branch, input.sourceBranch]);
+
+  return {
+    branch,
+    sourceBranch: input.sourceBranch,
+    mode: "new",
+    theme
+  };
 }
 
 export function buildMatchBranchName(plan: BranchPlan): string {

@@ -7,9 +7,10 @@ import { detectInstalledAgents } from "../agents/detector.js";
 import { loadConfig, loadRepoConfig, type RepoConfig } from "../config/config.js";
 import { DEFAULT_CONFIG, type GGConfig } from "../config/defaults.js";
 import { getRepoName, validateRepo } from "../lib/git.js";
+import { buildUserBaseBranchName, suggestBaseBranchTheme } from "../match/branch.js";
 import { MatchEngine } from "../match/engine.js";
 import { readThreadFromFile } from "../match/thread.js";
-import type { AgentEntry, Match, MatchThread as MatchThreadType, PromptStrategy } from "../match/types.js";
+import type { AgentEntry, BaseBranchMode, Match, MatchThread as MatchThreadType, PromptStrategy } from "../match/types.js";
 import { diffBranches } from "../preview/diff.js";
 import { switchPreviewBranch } from "../preview/worktree.js";
 import { scanRecoveryState } from "../recovery/recovery.js";
@@ -98,12 +99,15 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [promptStrategy, setPromptStrategy] = useState<PromptStrategy>(DEFAULT_CONFIG.gg.default_prompt_strategy);
   const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+  const [sourceBranch, setSourceBranch] = useState("main");
+  const [baseBranchMode, setBaseBranchMode] = useState<BaseBranchMode>("current");
+  const [branchTheme, setBranchTheme] = useState("");
+  const [isEditingBranchTheme, setIsEditingBranchTheme] = useState(false);
   const [selectedAgentProviders, setSelectedAgentProviders] = useState<string[]>([]);
   const [timeLimitSeconds, setTimeLimitSeconds] = useState<number | null>(
     DEFAULT_CONFIG.gg.default_time_limit > 0 ? DEFAULT_CONFIG.gg.default_time_limit : null
   );
 
-  const [baseBranch, setBaseBranch] = useState("main");
   const [repoIsClean, setRepoIsClean] = useState(true);
   const [statusMode, setStatusMode] = useState<StatusMode>("setup");
   const [notice, setNotice] = useState<string>("");
@@ -156,6 +160,15 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       }
     }
   }
+
+  const resolvedBaseBranch = useMemo(() => {
+    if (baseBranchMode === "current") {
+      return sourceBranch;
+    }
+
+    const theme = branchTheme.trim().length > 0 ? branchTheme : suggestBaseBranchTheme(prompt);
+    return buildUserBaseBranchName(theme);
+  }, [baseBranchMode, branchTheme, prompt, sourceBranch]);
 
   useEffect(() => {
     let mounted = true;
@@ -227,7 +240,10 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         setPromptStrategy(loadedConfig.gg.default_prompt_strategy);
         setDetectedAgents(availableAgents);
         setSelectedAgentProviders(availableAgents.slice(0, 2).map((item) => item.provider));
-        setBaseBranch(validation.currentBranch || "main");
+        setSourceBranch(validation.currentBranch || "main");
+        setBaseBranchMode(
+          validation.currentBranch === "main" || validation.currentBranch === "master" ? "new" : "current"
+        );
         setRepoIsClean(validation.isClean);
         setWarnings(startupWarnings);
 
@@ -288,6 +304,8 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     setThread(undefined);
     setDiffPreview("");
     setPostMatchAgentIndex(0);
+    setIsEditingPrompt(false);
+    setIsEditingBranchTheme(false);
   }
 
   function selectedAgentCount(): number {
@@ -450,6 +468,8 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     setDiffPreview("");
     setThread(undefined);
     setPostMatchAgentIndex(0);
+    setIsEditingPrompt(false);
+    setIsEditingBranchTheme(false);
 
     setLivePanes(
       Object.fromEntries(
@@ -471,6 +491,8 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         {
           prompt,
           promptStrategy,
+          baseBranchMode,
+          baseBranchTheme: branchTheme.trim().length > 0 ? branchTheme : suggestBaseBranchTheme(prompt),
           providers: selectedAgentProviders,
           timeLimitSeconds: timeLimitSeconds ?? undefined,
           privacy: config.leaderboard.default_privacy
@@ -537,7 +559,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       setCurrentMatch(started);
       setActiveView(2);
       setStatusMode("racing");
-      setNotice(`Running match ${started.id}`);
+      setNotice(`Running match ${started.id} from ${started.baseBranch}${started.sourceBranch ? ` (source ${started.sourceBranch})` : ""}`);
 
       void engine.waitForMatch(started.id).then((finished) => {
         setCurrentMatch({ ...finished, agents: [...finished.agents], stats: { ...finished.stats, agentStats: [...finished.stats.agentStats] } });
@@ -627,6 +649,8 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     try {
       const merged = await engineRef.current.mergeWinner(currentMatch.id, selected.id);
       setCurrentMatch(merged);
+      setSourceBranch(merged.baseBranch);
+      setBaseBranchMode(merged.baseBranch === "main" || merged.baseBranch === "master" ? "new" : "current");
       setStatusMode("merged");
       setNotice(`${selected.provider} wins and was merged into ${merged.baseBranch}`);
 
@@ -679,6 +703,13 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
     if (activeView === 1 && isEditingPrompt) {
       if (key.escape) {
         setIsEditingPrompt(false);
+      }
+      return;
+    }
+
+    if (activeView === 1 && isEditingBranchTheme) {
+      if (key.escape) {
+        setIsEditingBranchTheme(false);
       }
       return;
     }
@@ -792,6 +823,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
 
     if (key.escape) {
       setIsEditingPrompt(false);
+      setIsEditingBranchTheme(false);
     }
   });
 
@@ -816,12 +848,20 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
       return (
         <MatchSetup
           isActive={!showHelp}
+          sourceBranch={sourceBranch}
+          baseBranchMode={baseBranchMode}
+          branchTheme={branchTheme}
+          resolvedBaseBranch={resolvedBaseBranch}
           prompt={prompt}
           promptStrategy={promptStrategy}
           isEditingPrompt={isEditingPrompt}
+          isEditingBranchTheme={isEditingBranchTheme}
           selectedAgentProviders={selectedAgentProviders}
           availableAgents={detectedAgents}
           timeLimitSeconds={timeLimitSeconds}
+          onBaseBranchModeChange={setBaseBranchMode}
+          onBranchThemeChange={setBranchTheme}
+          onSetBranchThemeEditing={setIsEditingBranchTheme}
           onPromptChange={setPrompt}
           onSetPromptEditing={setIsEditingPrompt}
           onToggleAgent={toggleAgent}
@@ -887,6 +927,9 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
 
   const runningAgents = Object.values(livePanes).filter((pane) => pane.status === "running").length;
   const displayRunningAgents = statusMode === "racing" ? runningAgents : currentMatch?.agents.length ?? selectedAgentProviders.length;
+  const displaySourceBranch = currentMatch?.sourceBranch ?? sourceBranch;
+  const displayBaseBranch = currentMatch?.baseBranch ?? resolvedBaseBranch;
+  const displayBaseBranchMode = currentMatch?.baseBranchMode ?? baseBranchMode;
 
   return (
     <Box flexDirection="column">
@@ -895,7 +938,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
           gg
         </Text>
         <Text color={theme.muted}>
-          Good game. Every time. | repo: {repoName} | base: {baseBranch} | view {activeView}: {viewLabel(activeView)}
+          Good game. Every time. | repo: {repoName} | source: {displaySourceBranch} | base: {displayBaseBranch} | view {activeView}: {viewLabel(activeView)}
         </Text>
         <Text color={theme.accent}>[1]Setup [2]Live [3]Stats [4]Thread [5]Leaderboard [6]History [7]Profile [?]Help [q]Quit</Text>
         <Text color={theme.muted}>
@@ -903,7 +946,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
           {config.gg.default_time_limit > 0
             ? `${Math.floor(config.gg.default_time_limit / 60)} min`
             : "none (unlimited)"}{" "}
-          | Prompt strategy: {promptStrategy} | Selected agents: {selectedAgentProviders.length}
+          | Prompt strategy: {promptStrategy} | Base mode: {displayBaseBranchMode} | Selected agents: {selectedAgentProviders.length}
         </Text>
         {h2hSummary ? <Text color={theme.muted}>{h2hSummary}</Text> : null}
         {warnings.map((warning, index) => (
@@ -946,7 +989,7 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
         elapsedSeconds={elapsedSeconds}
         spentUSD={0}
         winner={currentMatch?.winnerId}
-        baseBranch={baseBranch}
+        baseBranch={displayBaseBranch}
       />
     </Box>
   );

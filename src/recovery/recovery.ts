@@ -13,7 +13,14 @@ export interface RecoveryScanOptions {
 export interface RecoveryScanResult {
   danglingBranches: string[];
   orphanedWorktrees: string[];
-  unfinishedMatches: string[];
+  unfinishedMatches: UnfinishedMatchRecord[];
+}
+
+export interface UnfinishedMatchRecord {
+  id: string;
+  sourceBranch: string | null;
+  baseBranch: string | null;
+  baseBranchMode: string | null;
 }
 
 function resolveWorktreeRoot(repoPath: string, worktreeDir: string): string {
@@ -31,7 +38,12 @@ function listWorktreeDirs(worktreeRoot: string): string[] {
     .map((entry) => path.join(worktreeRoot, entry.name));
 }
 
-function loadUnfinishedMatches(dbPath?: string): string[] {
+function hasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === columnName);
+}
+
+function loadUnfinishedMatches(dbPath?: string): UnfinishedMatchRecord[] {
   if (!dbPath || !fs.existsSync(dbPath)) {
     return [];
   }
@@ -40,11 +52,22 @@ function loadUnfinishedMatches(dbPath?: string): string[] {
 
   try {
     db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    const selectColumns = [
+      "id",
+      hasColumn(db, "matches", "source_branch") ? "source_branch as sourceBranch" : "NULL as sourceBranch",
+      hasColumn(db, "matches", "base_branch") ? "base_branch as baseBranch" : "NULL as baseBranch",
+      hasColumn(db, "matches", "base_branch_mode") ? "base_branch_mode as baseBranchMode" : "NULL as baseBranchMode"
+    ];
     const rows = db
-      .prepare("SELECT id FROM matches WHERE status NOT IN ('merged', 'cancelled') ORDER BY started_at DESC")
-      .all() as Array<{ id: string }>;
+      .prepare(
+        `SELECT ${selectColumns.join(", ")}
+         FROM matches
+         WHERE status NOT IN ('merged', 'cancelled')
+         ORDER BY started_at DESC`
+      )
+      .all() as UnfinishedMatchRecord[];
 
-    return rows.map((row) => row.id);
+    return rows;
   } catch {
     return [];
   } finally {

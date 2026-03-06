@@ -5,6 +5,9 @@ export interface MatchListItem {
   id: string;
   prompt: string;
   status: string;
+  sourceBranch: string | null;
+  baseBranch: string;
+  baseBranchMode: string | null;
   startedAt: string;
   endedAt: string | null;
   winnerId: string | null;
@@ -125,16 +128,18 @@ function updateHeadToHeadMap(
 export function persistMatch(db: Database.Database, match: Match): void {
   const insertMatch = db.prepare(
     `INSERT INTO matches (
-      id, prompt, repo, base_branch, status, privacy,
+      id, prompt, repo, source_branch, base_branch, base_branch_mode, status, privacy,
       started_at, ended_at, duration, winner_id, merged_branch, log_dir
     ) VALUES (
-      @id, @prompt, @repo, @base_branch, @status, @privacy,
+      @id, @prompt, @repo, @source_branch, @base_branch, @base_branch_mode, @status, @privacy,
       @started_at, @ended_at, @duration, @winner_id, @merged_branch, @log_dir
     )
     ON CONFLICT(id) DO UPDATE SET
       prompt = excluded.prompt,
       repo = excluded.repo,
+      source_branch = excluded.source_branch,
       base_branch = excluded.base_branch,
+      base_branch_mode = excluded.base_branch_mode,
       status = excluded.status,
       privacy = excluded.privacy,
       started_at = excluded.started_at,
@@ -192,7 +197,9 @@ export function persistMatch(db: Database.Database, match: Match): void {
       id: match.id,
       prompt: match.prompt,
       repo: match.repo,
+      source_branch: match.sourceBranch ?? null,
       base_branch: match.baseBranch,
+      base_branch_mode: match.baseBranchMode ?? null,
       status: match.status,
       privacy: match.privacy,
       started_at: match.startedAt.toISOString(),
@@ -320,7 +327,16 @@ function recomputeProfiles(db: Database.Database, stats: AgentMatchStats[]): voi
 
 export function getRecentMatches(db: Database.Database, limit = 20): MatchListItem[] {
   const stmt = db.prepare(
-    `SELECT id, prompt, status, started_at as startedAt, ended_at as endedAt, winner_id as winnerId
+    `SELECT
+        id,
+        prompt,
+        status,
+        source_branch as sourceBranch,
+        base_branch as baseBranch,
+        base_branch_mode as baseBranchMode,
+        started_at as startedAt,
+        ended_at as endedAt,
+        winner_id as winnerId
      FROM matches
      ORDER BY started_at DESC
      LIMIT ?`
