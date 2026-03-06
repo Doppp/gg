@@ -17,10 +17,12 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
     "lint": "tsc -p tsconfig.typecheck.json --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude test/tui-e2e.test.ts",
     "test:watch": "vitest",
     "test:e2e": "vitest run test/e2e-cli.test.ts",
-    "demo:e2e": "tsx scripts/e2e-smoke.ts"
+    "test:e2e:tui": "npm run build && vitest run test/tui-e2e.test.ts",
+    "demo:e2e": "tsx scripts/e2e-smoke.ts",
+    "demo:e2e:tui": "npm run build && tsx scripts/e2e-tui-smoke.ts"
   },
   "engines": {
     "node": ">=20"

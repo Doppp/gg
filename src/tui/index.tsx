@@ -79,12 +79,21 @@ function statusFromMatch(match: Match): StatusMode {
   return "merged";
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 export function App({ repoPath }: AppProps): React.JSX.Element {
   const { exit } = useApp();
   const repoName = useMemo(() => getRepoName(repoPath), [repoPath]);
+  const automationMode = process.env.GG_AUTOMATION_MODE ?? null;
+  const automationActive = automationMode === "tui-smoke";
 
   const dbRef = useRef<Database.Database | null>(null);
   const engineRef = useRef<MatchEngine | null>(null);
+  const automationStartedRef = useRef(false);
 
   const [activeView, setActiveView] = useState<ViewId>(1);
   const [showHelp, setShowHelp] = useState(false);
@@ -285,6 +294,29 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
 
     return () => clearInterval(interval);
   }, [statusMode]);
+
+  useEffect(() => {
+    if (!automationActive || loading || loadError || automationStartedRef.current) {
+      return;
+    }
+
+    if (detectedAgents.length < 2) {
+      return;
+    }
+
+    automationStartedRef.current = true;
+
+    void (async () => {
+      setPrompt("add search UI");
+      setPromptStrategy("competition");
+      setBaseBranchMode("new");
+      setBranchTheme("search-ui");
+      setNotice("Automation: launching scripted TUI smoke run...");
+
+      await sleep(500);
+      await startMatch();
+    })();
+  }, [automationActive, detectedAgents.length, loadError, loading]);
 
   function toggleAgent(provider: string): void {
     setSelectedAgentProviders((current) => {
@@ -545,6 +577,13 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
             });
           },
           onFinished: (finishedMatch) => {
+            const snapshot = {
+              ...finishedMatch,
+              agents: [...finishedMatch.agents],
+              stats: { ...finishedMatch.stats, agentStats: [...finishedMatch.stats.agentStats] }
+            };
+
+            setCurrentMatch(snapshot);
             const db = dbRef.current;
             if (db) {
               persistMatch(db, finishedMatch);
@@ -552,6 +591,25 @@ export function App({ repoPath }: AppProps): React.JSX.Element {
             }
             setNotice(`Match complete: ${finishedMatch.id}`);
             setActiveView(3);
+
+            if (automationActive) {
+              void (async () => {
+                await sleep(600);
+                const firstAgent = snapshot.agents[0];
+                if (firstAgent) {
+                  const loaded = readThreadFromFile(firstAgent.threadPath);
+                  if (loaded) {
+                    setThread(loaded);
+                    setPostMatchAgentIndex(0);
+                    setActiveView(4);
+                    setNotice(`Automation: viewing thread for ${firstAgent.provider}`);
+                  }
+                }
+
+                await sleep(600);
+                await handleQuit();
+              })();
+            }
           }
         }
       );

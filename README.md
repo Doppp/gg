@@ -126,6 +126,31 @@ GG_KEEP_E2E_TMP=1 npm run demo:e2e
 
 That keeps the temporary repo/home directory on disk so you can inspect the generated artifacts afterward.
 
+Interactive TUI smoke coverage is available separately:
+
+```bash
+npm run test:e2e:tui
+```
+
+That scenario launches the built TUI in a PTY, drives a scripted setup flow, waits for the live match and post-match screens, opens the thread view, and verifies the transcript.
+
+If you want to watch that scripted TUI flow outside Vitest:
+
+```bash
+npm run demo:e2e:tui
+```
+
+Optional:
+
+```bash
+GG_KEEP_E2E_TMP=1 npm run demo:e2e:tui
+```
+
+Notes:
+
+- `npm test` excludes the TUI smoke test because PTY transcript checks are slower and more environment-sensitive than the default suite.
+- The TUI smoke test is a scripted automation mode intended for end-to-end verification. It is not asserting arbitrary user keystrokes one-by-one.
+
 ## Config files
 
 - User config: `~/.config/gg/gg.toml` or local `./gg.toml`

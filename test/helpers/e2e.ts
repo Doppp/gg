@@ -38,6 +38,11 @@ const { spawnSync } = require("node:child_process");
 
 const provider = ${JSON.stringify(provider)};
 const args = process.argv.slice(2);
+const delayMs = Number(process.env.GG_FAKE_AGENT_DELAY_MS || "0");
+
+if (delayMs > 0) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+}
 
 if (args.includes("--version")) {
   process.stdout.write(provider + "-fake 1.0.0\\n");
